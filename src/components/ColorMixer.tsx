@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useCallback } from 'react';
-import { 
-  ColorPicker, 
-  ColorPickerSelection, 
-  ColorPickerHue, 
-  ColorPickerAlpha 
+import React, { useCallback, useEffect, useRef } from 'react';
+import {
+  ColorPicker,
+  ColorPickerSelection,
+  ColorPickerHue,
+  ColorPickerAlpha
 } from '@/components/ui/shadcn-io/color-picker';
 
 interface ColorMixerProps {
@@ -37,6 +37,19 @@ const ColorMixer: React.FC<ColorMixerProps> = ({
   leftLabel = "Left Color",
   rightLabel = "Right Color",
 }) => {
+  // Use keys to force ColorPicker re-render when colors change externally
+  const leftKeyRef = useRef(0);
+  const rightKeyRef = useRef(0);
+
+  // Update keys when colors change externally (from recall)
+  useEffect(() => {
+    leftKeyRef.current += 1;
+  }, [leftColor]);
+
+  useEffect(() => {
+    rightKeyRef.current += 1;
+  }, [rightColor]);
+
   const handleLeftColorChange = useCallback((rgba: any) => {
     // Convert RGBA array to hex color
     const r = Math.round(rgba[0]);
@@ -76,6 +89,7 @@ const ColorMixer: React.FC<ColorMixerProps> = ({
           </div>
           <div className="h-[200px]">
             <ColorPicker
+              key={`left-${leftKeyRef.current}`}
               defaultValue={leftColor}
               onChange={handleLeftColorChange}
               className="h-full"
@@ -106,6 +120,7 @@ const ColorMixer: React.FC<ColorMixerProps> = ({
           </div>
           <div className="h-[200px]">
             <ColorPicker
+              key={`right-${rightKeyRef.current}`}
               defaultValue={rightColor}
               onChange={handleRightColorChange}
               className="h-full"
