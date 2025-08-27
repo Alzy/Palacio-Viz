@@ -34,7 +34,7 @@ export const useOSC = (options: UseOSCOptions = {}) => {
   const [error, setError] = useState<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
 
@@ -119,7 +119,8 @@ export const useOSC = (options: UseOSCOptions = {}) => {
   }, []);
 
   const send = useCallback((address: string, ...args: any[]) => {
-    if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    // Use refs to avoid dependency on isConnected state
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.warn('⚠️  Cannot send OSC message: not connected');
       return false;
     }
@@ -133,7 +134,7 @@ export const useOSC = (options: UseOSCOptions = {}) => {
       console.error('❌ Failed to send OSC message:', err);
       return false;
     }
-  }, [isConnected]);
+  }, []); // No dependencies - completely stable
 
   // Auto-connect on mount
   useEffect(() => {

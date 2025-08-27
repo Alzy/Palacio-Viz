@@ -43,12 +43,12 @@ const Knob: React.FC<KnobProps> = ({
   label,
   showValue = true,
   valueDecimals = 2,
-  color = 'hsl(var(--primary))',
-  trackColor = 'hsl(var(--muted))',
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0, value: 0 });
   const knobRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
+  const dragStartRef = useRef({ y: 0, value: 0 });
 
   // Normalize value to 0-1 range
   const normalizedValue = (value - min) / (max - min);
@@ -75,37 +75,40 @@ const Knob: React.FC<KnobProps> = ({
     onChange(newValue);
   }, [disabled, value, onChange, clampValue, min, max]);
 
-  // Handle mouse down
+  // Handle mouse down for drag start
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
     if (disabled) return;
     
     event.preventDefault();
     setIsDragging(true);
-    setDragStart({
-      x: event.clientX,
+    isDraggingRef.current = true;
+    
+    dragStartRef.current = {
       y: event.clientY,
       value: value,
-    });
-  }, [disabled, value]);
+    };
 
-  // Handle mouse move (global)
-  const handleMouseMove = useCallback((event: MouseEvent) => {
-    if (!isDragging || disabled) return;
-    
-    const deltaX = event.clientX - dragStart.x;
-    const deltaY = dragStart.y - event.clientY; // Invert Y axis
-    
-    // Combine X and Y movement for more intuitive control
-    const combinedDelta = (deltaX + deltaY) * 0.005;
-    const newValue = clampValue(dragStart.value + combinedDelta * (max - min));
-    
-    onChange(newValue);
-  }, [isDragging, disabled, dragStart, onChange, clampValue, min, max]);
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      
+      const { y: startY, value: startValue } = dragStartRef.current;
+      const deltaY = startY - e.clientY;
+      const sensitivity = 0.005;
+      const change = deltaY * sensitivity * (max - min);
+      const newValue = clampValue(startValue + change);
+      onChange(newValue);
+    };
 
-  // Handle mouse up (global)
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [disabled, value, onChange, clampValue, min, max]);
 
   // Handle touch events
   const handleTouchStart = useCallback((event: React.TouchEvent) => {
@@ -114,125 +117,116 @@ const Knob: React.FC<KnobProps> = ({
     event.preventDefault();
     const touch = event.touches[0];
     setIsDragging(true);
-    setDragStart({
-      x: touch.clientX,
+    isDraggingRef.current = true;
+    
+    dragStartRef.current = {
       y: touch.clientY,
       value: value,
-    });
-  }, [disabled, value]);
+    };
 
-  const handleTouchMove = useCallback((event: TouchEvent) => {
-    if (!isDragging || disabled) return;
-    
-    event.preventDefault();
-    const touch = event.touches[0];
-    const deltaX = touch.clientX - dragStart.x;
-    const deltaY = dragStart.y - touch.clientY; // Invert Y axis
-    
-    const combinedDelta = (deltaX + deltaY) * 0.005;
-    const newValue = clampValue(dragStart.value + combinedDelta * (max - min));
-    
-    onChange(newValue);
-  }, [isDragging, disabled, dragStart, onChange, clampValue, min, max]);
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const { y: startY, value: startValue } = dragStartRef.current;
+      const deltaY = startY - touch.clientY;
+      const sensitivity = 0.005;
+      const change = deltaY * sensitivity * (max - min);
+      const newValue = clampValue(startValue + change);
+      onChange(newValue);
+    };
 
-  const handleTouchEnd = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+    const handleTouchEnd = () => {
+      isDraggingRef.current = false;
+      setIsDragging(false);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
 
-  // Global event listeners for drag operations
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.addEventListener('touchmove', handleTouchMove, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('touchend', handleTouchEnd);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  }, [disabled, value, onChange, clampValue, min, max]);
 
-  const knobSize = size;
-  const indicatorLength = knobSize * 0.35;
-  const indicatorX = Math.cos((angle * Math.PI) / 180) * indicatorLength;
-  const indicatorY = Math.sin((angle * Math.PI) / 180) * indicatorLength;
+  const center = size / 2;
+  const strokeWidth = size / 10;
+  const radius = center - strokeWidth / 2;
+  const circumference = 2 * Math.PI * radius;
+  
+  // -135 to 135 degrees is a 270 degree sweep
+  const arcLength = (circumference * 270) / 360;
+  const arcOffset = normalizedValue * arcLength;
+  
+  const rotation = angle + 2; // Add a 2-degree offset
 
   return (
     <div className={`inline-flex flex-col items-center space-y-2 ${className}`}>
-      {/* Knob */}
       <div
         ref={knobRef}
         className={`
-          relative rounded-full border-2 select-none touch-none
-          ${disabled 
-            ? 'cursor-not-allowed opacity-50' 
-            : 'cursor-pointer hover:shadow-lg'
-          }
-          ${isDragging ? 'shadow-lg scale-105' : ''}
-          transition-all duration-150
+          select-none touch-none
+          ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
         `}
-        style={{
-          width: knobSize,
-          height: knobSize,
-          backgroundColor: trackColor,
-          borderColor: color,
-        }}
+        style={{ width: size, height: size }}
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        {/* Track arc */}
         <svg
-          className="absolute inset-0"
-          width={knobSize}
-          height={knobSize}
-          style={{ transform: 'rotate(-135deg)' }}
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className={`
+           transition-transform duration-150
+           ${isDragging ? 'scale-105' : ''}
+          `}
         >
-          <circle
-            cx={knobSize / 2}
-            cy={knobSize / 2}
-            r={(knobSize - 8) / 2}
-            fill="none"
-            stroke={trackColor}
-            strokeWidth="3"
-            strokeDasharray={`${normalizedValue * 270 * ((knobSize - 8) * Math.PI / 180)} ${270 * ((knobSize - 8) * Math.PI / 180)}`}
-            strokeLinecap="round"
-            style={{
-              stroke: color,
-              opacity: 0.3,
-            }}
-          />
-        </svg>
+          <defs>
+            <filter id="knob-shadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="hsl(var(--foreground))" floodOpacity="0.4" />
+            </filter>
+          </defs>
 
-        {/* Center circle */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: knobSize * 0.7,
-            height: knobSize * 0.7,
-            backgroundColor: color,
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-          }}
-        >
-          {/* Indicator line */}
-          <div
-            className="absolute bg-white rounded-full"
-            style={{
-              width: 2,
-              height: indicatorLength,
-              top: '50%',
-              left: '50%',
-              transformOrigin: '50% 0%',
-              transform: `translate(-50%, -50%) rotate(${angle + 90}deg)`,
-            }}
-          />
-        </div>
+          {/* Background Track */}
+          <g transform={`rotate(135 ${center} ${center})`}>
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="transparent"
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${arcLength} ${circumference}`}
+              className="stroke-muted"
+            />
+          </g>
+          
+          {/* Value Arc */}
+          <g transform={`rotate(135 ${center} ${center})`}>
+            <circle
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="transparent"
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${arcOffset} ${circumference}`}
+              strokeLinecap="round"
+              className="stroke-primary"
+              style={{ transition: 'stroke-dasharray 0.1s linear' }}
+            />
+          </g>
+
+          {/* Indicator Line */}
+          <g transform={`rotate(${rotation} ${center} ${center})`} filter="url(#knob-shadow)">
+            <line
+              x1={center}
+              y1={strokeWidth / 2}
+              x2={center}
+              y2={strokeWidth * 1.5}
+              strokeWidth={strokeWidth / 1.5}
+              strokeLinecap="round"
+              className="stroke-foreground"
+            />
+          </g>
+        </svg>
       </div>
 
       {/* Label and Value */}
