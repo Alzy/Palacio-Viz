@@ -103,15 +103,8 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
 
   // Get slider background gradient based on bias
   const getSliderBackground = () => {
-    const leftIntensity = Math.max(0, (0.5 - bias) * 2);
-    const rightIntensity = Math.max(0, (bias - 0.5) * 2);
-
-    const leftColor = `hsla(220, 80%, 60%, ${0.5 + leftIntensity * 0.5})`;
-    const rightColor = `hsla(0, 80%, 60%, ${0.5 + rightIntensity * 0.5})`;
-    const centerColor = 'hsla(210, 9%, 20%, 0.2)';
-
     return {
-      background: `linear-gradient(to right, ${leftColor} 0%, ${centerColor} 50%, ${rightColor} 100%)`,
+      background: `linear-gradient(to right, hsla(220, 80%, 60%, 0.5), hsla(0, 80%, 60%, 0.5))`,
     };
   };
 
@@ -172,7 +165,7 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
         <div className="relative">
           {/* Slider Track with Gradient */}
           <div
-            className="absolute inset-0 h-5 rounded-lg border border-border"
+            className="absolute inset-0 h-2 top-1.5 rounded-lg border border-border"
             style={getSliderBackground()}
           />
           

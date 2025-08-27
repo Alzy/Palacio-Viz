@@ -106,16 +106,42 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
                 {seedTravelSpeed.toFixed(3)}
               </span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.001"
-              value={seedTravelSpeed}
-              onChange={(e) => handleSeedTravelSpeedChange(parseFloat(e.target.value))}
-              disabled={!isConnected}
-              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
-            />
+            <div className="relative">
+              <div
+                className="absolute inset-0 h-2 top-1.5 rounded-lg border border-border bg-muted"
+              />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.001"
+                value={seedTravelSpeed}
+                onChange={(e) => handleSeedTravelSpeedChange(parseFloat(e.target.value))}
+                disabled={!isConnected}
+                className={`
+                  relative w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer
+                  disabled:cursor-not-allowed
+                  [&::-webkit-slider-thumb]:appearance-none
+                  [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5
+                  [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-white
+                  [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-border
+                  [&::-webkit-slider-thumb]:shadow-md
+                  [&::-webkit-slider-thumb]:cursor-grab
+                  [&::-webkit-slider-thumb]:transition-all
+                  [&::-webkit-slider-thumb]:duration-150
+                  [&::-webkit-slider-thumb]:mt-[-6px]
+                  hover:[&::-webkit-slider-thumb]:border-ring
+                  active:[&::-webkit-slider-thumb]:cursor-grabbing
+                  [&::-moz-range-thumb]:appearance-none
+                  [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5
+                  [&::-moz-range-thumb]:rounded-full
+                  [&::-moz-range-thumb]:bg-white
+                  [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-border
+                  [&::-moz-range-thumb]:cursor-grab
+                `}
+              />
+            </div>
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>Slow</span>
               <span>Fast</span>
