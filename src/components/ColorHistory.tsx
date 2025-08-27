@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { useLightsStore } from '@/store/lightsStore';
 
 interface ColorPair {
   id: string;
@@ -11,43 +12,66 @@ interface ColorPair {
 }
 
 interface ColorHistoryProps {
-  /** Current color pair */
-  currentColors: { left: string; right: string };
-  /** Callback when colors are recalled */
-  onRecall: (leftColor: string, rightColor: string) => void;
   /** Whether the controls are disabled */
   disabled?: boolean;
 }
 
+const STORAGE_KEY = 'lights-color-history';
+
 const ColorHistory: React.FC<ColorHistoryProps> = ({
-  currentColors,
-  onRecall,
   disabled = false,
 }) => {
+  const { leftColor, rightColor, recallColors } = useLightsStore();
   const [colorHistory, setColorHistory] = useState<ColorPair[]>([]);
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setColorHistory(parsed);
+      }
+    } catch (error) {
+      console.error('Failed to load color history:', error);
+    }
+  }, []);
+
+  // Save history to localStorage whenever it changes
+  const saveToStorage = useCallback((history: ColorPair[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch (error) {
+      console.error('Failed to save color history:', error);
+    }
+  }, []);
 
   const handleSave = useCallback(() => {
     const newPair: ColorPair = {
       id: Date.now().toString(),
-      leftColor: currentColors.left,
-      rightColor: currentColors.right,
+      leftColor,
+      rightColor,
       timestamp: Date.now(),
     };
 
-    setColorHistory(prev => [newPair, ...prev]);
-  }, [currentColors]);
+    const newHistory = [newPair, ...colorHistory];
+    setColorHistory(newHistory);
+    saveToStorage(newHistory);
+  }, [leftColor, rightColor, colorHistory, saveToStorage]);
 
   const handleRecall = useCallback((pair: ColorPair) => {
-    onRecall(pair.leftColor, pair.rightColor);
-  }, [onRecall]);
+    recallColors(pair.leftColor, pair.rightColor);
+  }, [recallColors]);
 
   const handleRecallFlipped = useCallback((pair: ColorPair) => {
-    onRecall(pair.rightColor, pair.leftColor);
-  }, [onRecall]);
+    recallColors(pair.rightColor, pair.leftColor);
+  }, [recallColors]);
 
   const handleDelete = useCallback((id: string) => {
-    setColorHistory(prev => prev.filter(pair => pair.id !== id));
-  }, []);
+    const newHistory = colorHistory.filter(pair => pair.id !== id);
+    setColorHistory(newHistory);
+    saveToStorage(newHistory);
+  }, [colorHistory, saveToStorage]);
 
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString([], { 
@@ -76,19 +100,19 @@ const ColorHistory: React.FC<ColorHistoryProps> = ({
         <div className="text-sm text-muted-foreground mb-2">Current Colors:</div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <div 
+            <div
               className="w-6 h-6 rounded border border-border shadow-sm"
-              style={{ backgroundColor: currentColors.left }}
+              style={{ backgroundColor: leftColor }}
             />
-            <span className="text-xs font-mono">{currentColors.left}</span>
+            <span className="text-xs font-mono">{leftColor}</span>
           </div>
           <span className="text-muted-foreground">+</span>
           <div className="flex items-center gap-2">
-            <div 
+            <div
               className="w-6 h-6 rounded border border-border shadow-sm"
-              style={{ backgroundColor: currentColors.right }}
+              style={{ backgroundColor: rightColor }}
             />
-            <span className="text-xs font-mono">{currentColors.right}</span>
+            <span className="text-xs font-mono">{rightColor}</span>
           </div>
         </div>
       </div>

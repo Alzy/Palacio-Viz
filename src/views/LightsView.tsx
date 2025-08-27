@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import ColorMixer from '@/components/ColorMixer';
 import ColorHistory from '@/components/ColorHistory';
+import { useLightsStore } from '@/store/lightsStore';
 
 interface LightsViewProps {
   /** Whether the OSC connection is active */
@@ -12,8 +13,7 @@ interface LightsViewProps {
 }
 
 const LightsView: React.FC<LightsViewProps> = ({ isConnected, onSend }) => {
-  const [leftColor, setLeftColor] = useState('#ff0000'); // Default red
-  const [rightColor, setRightColor] = useState('#0000ff'); // Default blue
+  const { leftColor, rightColor, lastChangeSource } = useLightsStore();
 
   // Convert hex color to RGB values (0-255)
   const hexToRgb = useCallback((hex: string) => {
@@ -49,27 +49,18 @@ const LightsView: React.FC<LightsViewProps> = ({ isConnected, onSend }) => {
     onSend('/lights', ...leftNormalized, ...rightNormalized);
   }, [hexToRgb, onSend]);
 
+  // Handler for user interactions (ColorMixer changes) - OSC already sent by ColorMixer
   const handleColorChange = useCallback((newLeftColor: string, newRightColor: string) => {
-    setLeftColor(newLeftColor);
-    setRightColor(newRightColor);
+    // ColorMixer already updated the store, just send OSC
     sendColorMessage(newLeftColor, newRightColor);
   }, [sendColorMessage]);
 
-  const handleLeftColorChange = useCallback((color: string) => {
-    setLeftColor(color);
-    sendColorMessage(color, rightColor);
-  }, [rightColor, sendColorMessage]);
-
-  const handleRightColorChange = useCallback((color: string) => {
-    setRightColor(color);
-    sendColorMessage(leftColor, color);
-  }, [leftColor, sendColorMessage]);
-
-  const handleRecall = useCallback((recalledLeftColor: string, recalledRightColor: string) => {
-    setLeftColor(recalledLeftColor);
-    setRightColor(recalledRightColor);
-    sendColorMessage(recalledLeftColor, recalledRightColor);
-  }, [sendColorMessage]);
+  // Send OSC message when store state changes from recalls
+  useEffect(() => {
+    if (lastChangeSource === 'recall') {
+      sendColorMessage(leftColor, rightColor);
+    }
+  }, [leftColor, rightColor, lastChangeSource, sendColorMessage]);
 
   return (
     <div className="h-full flex flex-col space-y-6">
@@ -81,11 +72,7 @@ const LightsView: React.FC<LightsViewProps> = ({ isConnected, onSend }) => {
             Select two colors for your lighting setup. Colors are sent to /lights with RGBA values (alpha locked to 1.0).
           </p>
           <ColorMixer
-            leftColor={leftColor}
-            rightColor={rightColor}
             onChange={handleColorChange}
-            onLeftColorChange={handleLeftColorChange}
-            onRightColorChange={handleRightColorChange}
             disabled={!isConnected}
             leftLabel="Light A"
             rightLabel="Light B"
@@ -96,8 +83,6 @@ const LightsView: React.FC<LightsViewProps> = ({ isConnected, onSend }) => {
       {/* Color History */}
       <div className="bg-card rounded-lg shadow-md p-6 max-h-[50vh] flex flex-col">
         <ColorHistory
-          currentColors={{ left: leftColor, right: rightColor }}
-          onRecall={handleRecall}
           disabled={!isConnected}
         />
       </div>

@@ -7,18 +7,11 @@ import {
   ColorPickerHue,
   ColorPickerAlpha
 } from '@/components/ui/shadcn-io/color-picker';
+import { useLightsStore } from '@/store/lightsStore';
 
 interface ColorMixerProps {
-  /** Left color value */
-  leftColor: string;
-  /** Right color value */
-  rightColor: string;
-  /** Callback when colors change */
+  /** Callback when colors change (for OSC messaging) */
   onChange: (leftColor: string, rightColor: string) => void;
-  /** Callback when left color changes */
-  onLeftColorChange?: (color: string) => void;
-  /** Callback when right color changes */
-  onRightColorChange?: (color: string) => void;
   /** Whether the controls are disabled */
   disabled?: boolean;
   /** Label for left color picker */
@@ -28,27 +21,24 @@ interface ColorMixerProps {
 }
 
 const ColorMixer: React.FC<ColorMixerProps> = ({
-  leftColor,
-  rightColor,
   onChange,
-  onLeftColorChange,
-  onRightColorChange,
   disabled = false,
   leftLabel = "Left Color",
   rightLabel = "Right Color",
 }) => {
-  // Use keys to force ColorPicker re-render when colors change externally
+  const { leftColor, rightColor, setColors, lastChangeSource } = useLightsStore();
+  
+  // Use keys to force ColorPicker re-render when colors are recalled
   const leftKeyRef = useRef(0);
   const rightKeyRef = useRef(0);
 
-  // Update keys when colors change externally (from recall)
+  // Update keys when colors change from recalls
   useEffect(() => {
-    leftKeyRef.current += 1;
-  }, [leftColor]);
-
-  useEffect(() => {
-    rightKeyRef.current += 1;
-  }, [rightColor]);
+    if (lastChangeSource === 'recall') {
+      leftKeyRef.current += 1;
+      rightKeyRef.current += 1;
+    }
+  }, [leftColor, rightColor, lastChangeSource]);
 
   const handleLeftColorChange = useCallback((rgba: any) => {
     // Convert RGBA array to hex color
@@ -57,9 +47,10 @@ const ColorMixer: React.FC<ColorMixerProps> = ({
     const b = Math.round(rgba[2]);
     const hexColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     
-    onLeftColorChange?.(hexColor);
+    // Update store and signal change to parent for OSC
+    setColors(hexColor, rightColor, 'user');
     onChange(hexColor, rightColor);
-  }, [rightColor, onChange, onLeftColorChange]);
+  }, [rightColor, onChange, setColors]);
 
   const handleRightColorChange = useCallback((rgba: any) => {
     // Convert RGBA array to hex color
@@ -68,10 +59,10 @@ const ColorMixer: React.FC<ColorMixerProps> = ({
     const b = Math.round(rgba[2]);
     const hexColor = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     
-    onRightColorChange?.(hexColor);
+    // Update store and signal change to parent for OSC
+    setColors(leftColor, hexColor, 'user');
     onChange(leftColor, hexColor);
-  }, [leftColor, onChange, onRightColorChange]);
-
+  }, [leftColor, onChange, setColors]);
   return (
     <div className="space-y-6">
       {/* Color Pickers Row */}
