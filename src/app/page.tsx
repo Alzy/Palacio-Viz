@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useOSC } from '@/hooks/useOSC';
-import { PromptView, FXView, FeedbackView } from '@/views';
+import { PromptView, FXView, FeedbackView, LightsView } from '@/views';
 import ConnectionStatus from '@/components/ConnectionStatus';
 
 export default function Home() {
@@ -14,6 +14,7 @@ export default function Home() {
     { id: 'prefx', label: 'PreFX', component: <FXView isConnected={isConnected} onSend={send} fxType="pre" /> },
     { id: 'postfx', label: 'PostFX', component: <FXView isConnected={isConnected} onSend={send} fxType="post" /> },
     { id: 'feedback', label: 'Feedback', component: <FeedbackView isConnected={isConnected} onSend={send} /> },
+    { id: 'lights', label: 'Lights', component: <LightsView isConnected={isConnected} onSend={send} /> },
   ];
 
   return (
