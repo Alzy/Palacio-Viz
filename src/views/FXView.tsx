@@ -37,6 +37,14 @@ const FXView: React.FC<FXViewProps> = ({
     onSend(`/${fxType}/brightness_contrast`, x, y);
   }, [fxType, onSend]);
 
+  const handleZoomChange = useCallback((x: number, y: number) => {
+    onSend(`/${fxType}/zoom`, x, y);
+  }, [fxType, onSend]);
+
+  const handlePanChange = useCallback((x: number, y: number) => {
+    onSend(`/${fxType}/pan`, x, y);
+  }, [fxType, onSend]);
+
   const handleBlackLevelChange = useCallback((value: number) => {
     blackLevelRef.current = value;
     setBlackLevel(value);
@@ -148,6 +156,40 @@ const FXView: React.FC<FXViewProps> = ({
                   step={0.01}
                   disabled={!isConnected}
                   size={120}
+              />
+            </div>
+          </ControlCard>
+        </div>
+      </div>
+      
+      {/* Third Row - Zoom and Pan */}
+      <div className="flex flex-1 gap-6">
+        <div className="flex-1">
+          <ControlCard
+            title="Zoom Control"
+            description={`X: Zoom X, Y: Zoom Y. Sends to /${fxType}/zoom`}
+          >
+            <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
+              <XYControl
+                onChange={handleZoomChange}
+                disabled={!isConnected}
+                xTitle="Zoom X"
+                yTitle="Zoom Y"
+              />
+            </div>
+          </ControlCard>
+        </div>
+        <div className="flex-1">
+          <ControlCard
+            title="Pan Control"
+            description={`X: Pan X, Y: Pan Y. Sends to /${fxType}/pan`}
+          >
+            <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
+              <XYControl
+                onChange={handlePanChange}
+                disabled={!isConnected}
+                xTitle="Pan X"
+                yTitle="Pan Y"
               />
             </div>
           </ControlCard>
