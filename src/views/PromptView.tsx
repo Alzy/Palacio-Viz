@@ -60,10 +60,10 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
   return (
     <div className="h-full flex flex-col space-y-6">
       {/* Main Prompt Mixer */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">Prompt Mixer</h2>
+      <div className="bg-card rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground">Prompt Mixer</h2>
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Enter prompts on both sides and use the slider to bias between them (sends to /prompt)
           </p>
           <PromptMixer
@@ -82,7 +82,7 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
       </div>
 
       {/* Prompt History */}
-      <div className="flex-1 bg-white rounded-lg shadow-md p-6">
+      <div className="bg-card rounded-lg shadow-md p-6 max-h-[30vh] flex flex-col">
         <PromptHistory
           prompts={promptHistory}
           onSelectLeft={handleSelectLeftFromHistory}
@@ -91,18 +91,18 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
       </div>
 
       {/* Seed Travel Speed Control */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">Seed Travel Speed</h2>
+      <div className="bg-card rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground">Seed Travel Speed</h2>
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Control the speed of seed transitions (sends to /seed_travel_speed)
           </p>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <label className="text-sm font-medium text-gray-700">
+              <label className="text-sm font-medium text-foreground">
                 Speed
               </label>
-              <span className="text-sm font-medium text-gray-600">
+              <span className="text-sm font-medium text-muted-foreground">
                 {seedTravelSpeed.toFixed(3)}
               </span>
             </div>
@@ -114,9 +114,9 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
               value={seedTravelSpeed}
               onChange={(e) => handleSeedTravelSpeedChange(parseFloat(e.target.value))}
               disabled={!isConnected}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer slider"
             />
-            <div className="flex justify-between text-xs text-gray-500">
+            <div className="flex justify-between text-xs text-muted-foreground">
               <span>Slow</span>
               <span>Fast</span>
             </div>

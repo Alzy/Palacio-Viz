@@ -26,12 +26,12 @@ const FXView: React.FC<FXViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-xl font-semibold mb-4">
+      <div className="bg-card rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-4 text-foreground">
           {title || `${fxType.charAt(0).toUpperCase() + fxType.slice(1)}FX Control`}
         </h2>
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-muted-foreground">
             Drag the point to send X/Y coordinates to TouchDesigner (sends to /{fxType}fx)
           </p>
           <div className="flex justify-center">

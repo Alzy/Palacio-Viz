@@ -28,9 +28,9 @@ const PromptHistory: React.FC<PromptHistoryProps> = ({
   }
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      <h3 className="text-sm font-medium text-gray-700 mb-3">Prompt History</h3>
-      <div className="max-h-64 overflow-y-auto space-y-2">
+    <div className={`h-full flex flex-col ${className}`}>
+      <h3 className="text-sm font-medium text-foreground mb-3 flex-shrink-0">Prompt History</h3>
+      <div className="flex-1 overflow-y-auto space-y-2">
         {prompts.map((prompt, index) => (
           <div
             key={`${prompt}-${index}`}
@@ -39,7 +39,8 @@ const PromptHistory: React.FC<PromptHistoryProps> = ({
             {/* Left Arrow */}
             <button
               onClick={() => onSelectLeft(prompt)}
-              className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-600 flex items-center justify-center transition-colors opacity-70 group-hover:opacity-100"
+              className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 hover:bg-blue-500/90 text-white flex items-center justify-center transition-colors_
+ opacity-70 group-hover:opacity-100"
               title="Use as left prompt"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,8 +50,8 @@ const PromptHistory: React.FC<PromptHistoryProps> = ({
 
             {/* Prompt Badge */}
             <div className="flex-1 min-w-0">
-              <div className="bg-gray-100 hover:bg-gray-200 rounded-lg px-3 py-2 transition-colors">
-                <p className="text-sm text-gray-800 truncate" title={prompt}>
+              <div className="bg-muted hover:bg-muted/50 rounded-lg px-3 py-2 transition-colors">
+                <p className="text-sm text-foreground truncate" title={prompt}>
                   {prompt}
                 </p>
               </div>
@@ -59,7 +60,7 @@ const PromptHistory: React.FC<PromptHistoryProps> = ({
             {/* Right Arrow */}
             <button
               onClick={() => onSelectRight(prompt)}
-              className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center transition-colors opacity-70 group-hover:opacity-100"
+              className="flex-shrink-0 w-8 h-8 rounded-full bg-red-500 hover:bg-red-500/90 text-white flex items-center justify-center transition-colors opacity-70 group-hover:opacity-100"
               title="Use as right prompt"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

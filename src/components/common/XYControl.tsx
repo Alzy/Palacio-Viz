@@ -39,9 +39,9 @@ const XYControl: React.FC<XYControlProps> = ({
   className = '',
   disabled = false,
   gridLines = 4,
-  pointColor = '#3b82f6',
-  gridColor = '#e5e7eb',
-  backgroundColor = '#f9fafb',
+  pointColor = 'hsl(var(--primary))',
+  gridColor = 'hsl(var(--foreground))',
+  backgroundColor = 'hsl(var(--muted))',
   xTitle,
   yTitle,
 }) => {
@@ -181,9 +181,9 @@ const XYControl: React.FC<XYControlProps> = ({
           y1={0}
           x2={pos * SVG_SIZE}
           y2={SVG_SIZE}
-          stroke={gridColor}
+          className="stroke-foreground"
           strokeWidth="1"
-          opacity="0.5"
+          opacity="0.2"
         />
       );
 
@@ -195,9 +195,9 @@ const XYControl: React.FC<XYControlProps> = ({
           y1={pos * SVG_SIZE}
           x2={SVG_SIZE}
           y2={pos * SVG_SIZE}
-          stroke={gridColor}
+          className="stroke-foreground"
           strokeWidth="1"
-          opacity="0.5"
+          opacity="0.2"
         />
       );
     }
@@ -215,7 +215,7 @@ const XYControl: React.FC<XYControlProps> = ({
         height="100%"
         viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
         preserveAspectRatio="xMidYMid meet"
-        className={`border border-gray-300 rounded-lg cursor-${disabled ? 'not-allowed' : 'crosshair'} select-none touch-none`}
+        className={`border border-border rounded-lg cursor-${disabled ? 'not-allowed' : 'crosshair'} select-none touch-none`}
         style={{
           backgroundColor,
           aspectRatio: '1',
@@ -229,7 +229,7 @@ const XYControl: React.FC<XYControlProps> = ({
         <rect
           width={SVG_SIZE}
           height={SVG_SIZE}
-          fill={backgroundColor}
+          className="fill-muted"
         />
 
         {/* Grid lines */}
@@ -240,8 +240,9 @@ const XYControl: React.FC<XYControlProps> = ({
           width={SVG_SIZE}
           height={SVG_SIZE}
           fill="none"
-          stroke={gridColor}
-          strokeWidth="2"
+          className="stroke-foreground"
+          strokeWidth="1"
+          opacity="0.2"
         />
 
         {/* Center axis lines */}
@@ -250,18 +251,18 @@ const XYControl: React.FC<XYControlProps> = ({
           y1={0}
           x2={SVG_SIZE / 2}
           y2={SVG_SIZE}
-          stroke={gridColor}
-          strokeWidth="2"
-          opacity="0.6"
+          className="stroke-foreground"
+          strokeWidth="1"
+          opacity="0.4"
         />
         <line
           x1={0}
           y1={SVG_SIZE / 2}
           x2={SVG_SIZE}
           y2={SVG_SIZE / 2}
-          stroke={gridColor}
-          strokeWidth="2"
-          opacity="0.6"
+          className="stroke-foreground"
+          strokeWidth="1"
+          opacity="0.4"
         />
 
         {/* Control point */}
@@ -269,10 +270,8 @@ const XYControl: React.FC<XYControlProps> = ({
           cx={svgPosition.x}
           cy={svgPosition.y}
           r="10"
-          fill={pointColor}
-          stroke="white"
+          className={`${disabled ? 'opacity-50' : ''} transition-transform duration-150 fill-primary stroke-background`}
           strokeWidth="3"
-          className={`${disabled ? 'opacity-50' : ''} transition-transform duration-150`}
           style={{
             filter: isDragging
               ? 'drop-shadow(0 6px 12px rgba(0,0,0,0.3))'
@@ -284,10 +283,9 @@ const XYControl: React.FC<XYControlProps> = ({
         <text
           x={10}
           y={SVG_SIZE - 10}
-          fill="#666"
+          className="pointer-events-none select-none fill-muted-foreground"
           fontSize="11"
           fontFamily="monospace"
-          className="pointer-events-none select-none"
         >
           X: {position.x.toFixed(3)}, Y: {position.y.toFixed(3)}
         </text>
@@ -297,11 +295,10 @@ const XYControl: React.FC<XYControlProps> = ({
           <text
             x={SVG_SIZE / 2}
             y={SVG_SIZE - 25}
-            fill="#666"
+            className="pointer-events-none select-none fill-muted-foreground"
             fontSize="14"
             fontWeight="500"
             textAnchor="middle"
-            className="pointer-events-none select-none"
           >
             {xTitle}
           </text>
@@ -312,12 +309,11 @@ const XYControl: React.FC<XYControlProps> = ({
           <text
             x={20}
             y={SVG_SIZE / 2}
-            fill="#666"
             fontSize="14"
             fontWeight="500"
             textAnchor="middle"
             transform={`rotate(-90, 20, ${SVG_SIZE / 2})`}
-            className="pointer-events-none select-none"
+            className="pointer-events-none select-none fill-muted-foreground"
           >
             {yTitle}
           </text>

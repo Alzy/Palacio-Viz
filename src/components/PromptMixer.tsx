@@ -105,12 +105,13 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
   const getSliderBackground = () => {
     const leftIntensity = Math.max(0, (0.5 - bias) * 2);
     const rightIntensity = Math.max(0, (bias - 0.5) * 2);
-    
+
+    const leftColor = `hsla(220, 80%, 60%, ${0.5 + leftIntensity * 0.5})`;
+    const rightColor = `hsla(0, 80%, 60%, ${0.5 + rightIntensity * 0.5})`;
+    const centerColor = 'hsla(210, 9%, 20%, 0.2)';
+
     return {
-      background: `linear-gradient(to right, 
-        rgba(59, 130, 246, ${0.3 + leftIntensity * 0.4}) 0%, 
-        rgba(156, 163, 175, 0.2) 50%, 
-        rgba(239, 68, 68, ${0.3 + rightIntensity * 0.4}) 100%)`
+      background: `linear-gradient(to right, ${leftColor} 0%, ${centerColor} 50%, ${rightColor} 100%)`,
     };
   };
 
@@ -120,7 +121,7 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left Prompt */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-foreground">
             {leftLabel}
           </label>
           <DebouncedTextInput
@@ -132,14 +133,14 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
               focus:ring-blue-500 focus:border-blue-500
               ${textAreaHeight}
             `}
-            multiline={false}
+            multiline={true}
             rows={4}
           />
         </div>
 
         {/* Right Prompt */}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-foreground">
             {rightLabel}
           </label>
           <DebouncedTextInput
@@ -151,7 +152,7 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
               focus:ring-red-500 focus:border-red-500
               ${textAreaHeight}
             `}
-            multiline={false}
+            multiline={true}
             rows={4}
           />
         </div>
@@ -160,18 +161,18 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
       {/* Bias Slider Section */}
       <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <label className="text-sm font-medium text-gray-700">
+          <label className="text-sm font-medium text-foreground">
             Prompt Bias
           </label>
-          <span className="text-sm font-medium text-gray-600">
+          <span className="text-sm font-medium text-muted-foreground">
             {getBiasPercentage()}
           </span>
         </div>
         
         <div className="relative">
           {/* Slider Track with Gradient */}
-          <div 
-            className="absolute inset-0 h-5 rounded-lg border border-gray-200"
+          <div
+            className="absolute inset-0 h-5 rounded-lg border border-border"
             style={getSliderBackground()}
           />
           
@@ -193,20 +194,20 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
               [&::-webkit-slider-thumb]:rounded-full
               [&::-webkit-slider-thumb]:bg-white
               [&::-webkit-slider-thumb]:border-2
-              [&::-webkit-slider-thumb]:border-gray-400
+              [&::-webkit-slider-thumb]:border-border
               [&::-webkit-slider-thumb]:shadow-md
               [&::-webkit-slider-thumb]:cursor-pointer
               [&::-webkit-slider-thumb]:transition-all
               [&::-webkit-slider-thumb]:duration-150
               [&::-webkit-slider-thumb]:mt-[-6px]
-              hover:[&::-webkit-slider-thumb]:border-gray-500
+              hover:[&::-webkit-slider-thumb]:border-ring
               hover:[&::-webkit-slider-thumb]:shadow-lg
               [&::-moz-range-thumb]:h-5
               [&::-moz-range-thumb]:w-5
               [&::-moz-range-thumb]:rounded-full
-              [&::-moz-range-thumb]:bg-white
+              [&::-moz-range-thumb]:bg-card
               [&::-moz-range-thumb]:border-2
-              [&::-moz-range-thumb]:border-gray-400
+              [&::-moz-range-thumb]:border-border
               [&::-moz-range-thumb]:cursor-pointer
               [&::-moz-range-thumb]:border-none
               [&::-moz-range-track]:bg-transparent
@@ -216,12 +217,12 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
         </div>
 
         {/* Bias Labels */}
-        <div className="flex justify-between text-xs text-gray-500">
+        <div className="flex justify-between text-xs text-muted-foreground">
           <span className="flex items-center space-x-1">
             <div className="w-3 h-3 bg-blue-500 rounded-full opacity-60"></div>
             <span>Left Bias</span>
           </span>
-          <span className="text-gray-400">Center</span>
+          <span className="text-muted-foreground/50">Center</span>
           <span className="flex items-center space-x-1">
             <span>Right Bias</span>
             <div className="w-3 h-3 bg-red-500 rounded-full opacity-60"></div>

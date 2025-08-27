@@ -55,7 +55,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   };
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-3">
+    <div className="bg-card border-b border-border px-6 py-3">
       <div className="flex items-center justify-between">
         {/* Left side - Status and info */}
         <div className="flex items-center space-x-4">
@@ -67,7 +67,7 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           </div>
           
           {error && (
-            <span className="text-red-600 text-sm">
+            <span className="text-destructive text-sm">
               Error: {error}
             </span>
           )}
@@ -78,14 +78,14 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           <button
             onClick={onConnect}
             disabled={isConnected}
-            className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm transition-colors"
+            className="bg-primary hover:bg-primary/90 disabled:bg-muted text-primary-foreground px-3 py-1 rounded text-sm transition-colors"
           >
             Connect
           </button>
           <button
             onClick={onDisconnect}
             disabled={!isConnected}
-            className="bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white px-3 py-1 rounded text-sm transition-colors"
+            className="bg-destructive hover:bg-destructive/90 disabled:bg-muted text-destructive-foreground px-3 py-1 rounded text-sm transition-colors"
           >
             Disconnect
           </button>

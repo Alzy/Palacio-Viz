@@ -43,8 +43,8 @@ const Knob: React.FC<KnobProps> = ({
   label,
   showValue = true,
   valueDecimals = 2,
-  color = '#3b82f6',
-  trackColor = '#e5e7eb',
+  color = 'hsl(var(--primary))',
+  trackColor = 'hsl(var(--muted))',
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, value: 0 });
@@ -239,10 +239,10 @@ const Knob: React.FC<KnobProps> = ({
       {(label || showValue) && (
         <div className="text-center">
           {label && (
-            <div className="text-sm font-medium text-gray-700">{label}</div>
+            <div className="text-sm font-medium text-foreground">{label}</div>
           )}
           {showValue && (
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground">
               {value.toFixed(valueDecimals)}
             </div>
           )}
