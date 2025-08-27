@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
+import DebouncedTextInput from './common/DebouncedTextInput';
 
 export interface PromptMixerProps {
   /** Initial left prompt text */
@@ -59,6 +60,15 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
   const [rightText, setRightText] = useState(rightPrompt);
   const [bias, setBias] = useState(initialBias);
 
+  // Sync with prop changes
+  useEffect(() => {
+    setLeftText(leftPrompt || '');
+  }, [leftPrompt]);
+
+  useEffect(() => {
+    setRightText(rightPrompt || '');
+  }, [rightPrompt]);
+
   // Handle left prompt changes
   const handleLeftPromptChange = useCallback((value: string) => {
     setLeftText(value);
@@ -113,18 +123,17 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
           <label className="block text-sm font-medium text-gray-700">
             {leftLabel}
           </label>
-          <textarea
+          <DebouncedTextInput
             value={leftText}
-            onChange={(e) => handleLeftPromptChange(e.target.value)}
+            onChange={handleLeftPromptChange}
             placeholder={leftPlaceholder}
             disabled={disabled}
             className={`
-              w-full px-3 py-2 border border-gray-300 rounded-lg resize-none
-              focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-              disabled:bg-gray-100 disabled:cursor-not-allowed
-              transition-colors duration-200
+              focus:ring-blue-500 focus:border-blue-500
               ${textAreaHeight}
             `}
+            multiline={false}
+            rows={4}
           />
         </div>
 
@@ -133,18 +142,17 @@ const PromptMixer: React.FC<PromptMixerProps> = ({
           <label className="block text-sm font-medium text-gray-700">
             {rightLabel}
           </label>
-          <textarea
+          <DebouncedTextInput
             value={rightText}
-            onChange={(e) => handleRightPromptChange(e.target.value)}
+            onChange={handleRightPromptChange}
             placeholder={rightPlaceholder}
             disabled={disabled}
             className={`
-              w-full px-3 py-2 border border-gray-300 rounded-lg resize-none
-              focus:ring-2 focus:ring-red-500 focus:border-red-500
-              disabled:bg-gray-100 disabled:cursor-not-allowed
-              transition-colors duration-200
+              focus:ring-red-500 focus:border-red-500
               ${textAreaHeight}
             `}
+            multiline={false}
+            rows={4}
           />
         </div>
       </div>
