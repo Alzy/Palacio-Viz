@@ -3,6 +3,13 @@
 import React, { useState, useCallback, useRef } from 'react';
 import XYControl from '@/components/common/XYControl';
 import Knob from '@/components/common/Knob';
+import {
+  ColorPicker,
+  ColorPickerSelection,
+  ColorPickerHue,
+  ColorPickerAlpha
+} from '@/components/ui/shadcn-io/color-picker';
+import {bgWhite} from "next/dist/lib/picocolors";
 
 interface FXViewProps {
   /** Whether the OSC connection is active */
@@ -20,6 +27,7 @@ const FXView: React.FC<FXViewProps> = ({
 }) => {
   const [blackLevel, setBlackLevel] = useState(0);
   const [saturation, setSaturation] = useState(1);
+  const [tintColor, setTintColor] = useState('#ff0000'); // Default red for visibility
   
   // Use refs to avoid re-renders during drag operations
   const blackLevelRef = useRef(blackLevel);
@@ -41,8 +49,20 @@ const FXView: React.FC<FXViewProps> = ({
     onSend(`/${fxType}/saturation`, value);
   }, [fxType, onSend]);
 
-  const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode }> = ({ title, description, children }) => (
-    <div className="bg-card rounded-lg shadow-md p-4 flex flex-col">
+  const handleTintChange = useCallback((rgba: any) => {
+    // rgba comes as [r, g, b, a] where r,g,b are 0-255 and a is 0-1
+    const normalizedRgba = [
+      rgba[0] / 255,
+      rgba[1] / 255,
+      rgba[2] / 255,
+      rgba[3] // Alpha is already 0-1
+    ];
+    
+    onSend(`/${fxType}/tint`, ...normalizedRgba);
+  }, [fxType, onSend]);
+
+  const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode; className?: string; }> = ({ title, description, children, className }) => (
+    <div className={`bg-card rounded-lg shadow-md p-4 flex flex-col ${className}`}>
       <h3 className="text-lg font-semibold mb-2 text-foreground">{title}</h3>
       <p className="text-xs text-muted-foreground mb-4 flex-grow">{description}</p>
       {children}
@@ -68,13 +88,27 @@ const FXView: React.FC<FXViewProps> = ({
             </div>
           </ControlCard>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 h-full">
           <ControlCard
-            title="Future Control"
-            description="This space is reserved for a future feature."
+            title="Tint Control"
+            description={`Color tinting effect. Sends RGBA floats to /${fxType}/tint`}
+            className={`h-full`}
           >
-            <div className="flex-grow flex items-center justify-center">
-              <p className="text-muted-foreground italic">Coming soon...</p>
+            <div className="w-full h-full min-h-[200px] p-4">
+              <ColorPicker
+                defaultValue="#ff0000"
+                onChange={handleTintChange}
+                className="w-full h-full"
+              >
+                <ColorPickerSelection className={'flex-1'}  />
+                <div className="space-y-2">
+                  <ColorPickerHue />
+                  <div className={`bg-gray-400`}>
+                    <ColorPickerAlpha />
+                  </div>
+
+                </div>
+              </ColorPicker>
             </div>
           </ControlCard>
         </div>
