@@ -47,8 +47,8 @@ const Knob: React.FC<KnobProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const knobRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
-  const activePointerIdRef = useRef<number | null>(null);
   const dragStartRef = useRef({ y: 0, value: 0 });
+  const lastValueRef = useRef(value);
 
   // Normalize value to 0-1 range
   const normalizedValue = (value - min) / (max - min);
@@ -65,6 +65,19 @@ const Knob: React.FC<KnobProps> = ({
     return clamped;
   }, [min, max, step]);
 
+  // Only call onChange if value actually changed
+  const handleValueChange = useCallback((newValue: number) => {
+    if (newValue !== lastValueRef.current) {
+      lastValueRef.current = newValue;
+      onChange(newValue);
+    }
+  }, [onChange]);
+
+  // Update lastValueRef when value prop changes
+  useEffect(() => {
+    lastValueRef.current = value;
+  }, [value]);
+
   // Handle scroll wheel
   const handleWheel = useCallback((event: React.WheelEvent) => {
     if (disabled) return;
@@ -72,8 +85,8 @@ const Knob: React.FC<KnobProps> = ({
     event.preventDefault();
     const delta = -event.deltaY * 0.001; // Invert and scale
     const newValue = clampValue(value + delta * (max - min));
-    onChange(newValue);
-  }, [disabled, value, onChange, clampValue, min, max]);
+    handleValueChange(newValue);
+  }, [disabled, value, handleValueChange, clampValue, min, max]);
 
   // Handle mouse down for drag start
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
@@ -96,7 +109,7 @@ const Knob: React.FC<KnobProps> = ({
       const sensitivity = 0.005;
       const change = deltaY * sensitivity * (max - min);
       const newValue = clampValue(startValue + change);
-      onChange(newValue);
+      handleValueChange(newValue);
     };
 
     const handleMouseUp = () => {
@@ -108,7 +121,7 @@ const Knob: React.FC<KnobProps> = ({
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [disabled, value, onChange, clampValue, min, max]);
+  }, [disabled, value, handleValueChange, clampValue, min, max]);
 
   // Handle touch events
   const handleTouchStart = useCallback((event: React.TouchEvent) => {
@@ -133,7 +146,7 @@ const Knob: React.FC<KnobProps> = ({
       const sensitivity = 0.005;
       const change = deltaY * sensitivity * (max - min);
       const newValue = clampValue(startValue + change);
-      onChange(newValue);
+      handleValueChange(newValue);
     };
 
     const handleTouchEnd = () => {
@@ -145,7 +158,7 @@ const Knob: React.FC<KnobProps> = ({
 
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
-  }, [disabled, value, onChange, clampValue, min, max]);
+  }, [disabled, value, handleValueChange, clampValue, min, max]);
 
   const center = size / 2;
   const strokeWidth = size / 10;
