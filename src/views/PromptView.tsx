@@ -16,6 +16,7 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
   const [leftPrompt, setLeftPrompt] = useState('');
   const [rightPrompt, setRightPrompt] = useState('');
   const [currentBias, setCurrentBias] = useState(0.5);
+  const [seedTravelSpeed, setSeedTravelSpeed] = useState(0.5);
 
   // Add unique prompt to history
   const addToHistory = useCallback((prompt: string) => {
@@ -27,6 +28,11 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
   const handlePromptMix = (leftPrompt: string, rightPrompt: string, bias: number) => {
     setCurrentBias(bias);
     onSend('/prompt', leftPrompt, rightPrompt, bias);
+  };
+
+  const handleSeedTravelSpeedChange = (speed: number) => {
+    setSeedTravelSpeed(speed);
+    onSend('/seed_travel_speed', speed);
   };
 
   const handleLeftPromptChange = useCallback((prompt: string) => {
@@ -75,13 +81,47 @@ const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
         </div>
       </div>
 
-      {/* Prompt History Below */}
+      {/* Prompt History */}
       <div className="flex-1 bg-white rounded-lg shadow-md p-6">
         <PromptHistory
           prompts={promptHistory}
           onSelectLeft={handleSelectLeftFromHistory}
           onSelectRight={handleSelectRightFromHistory}
         />
+      </div>
+
+      {/* Seed Travel Speed Control */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-4">Seed Travel Speed</h2>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Control the speed of seed transitions (sends to /seed_travel_speed)
+          </p>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium text-gray-700">
+                Speed
+              </label>
+              <span className="text-sm font-medium text-gray-600">
+                {seedTravelSpeed.toFixed(3)}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.001"
+              value={seedTravelSpeed}
+              onChange={(e) => handleSeedTravelSpeedChange(parseFloat(e.target.value))}
+              disabled={!isConnected}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            />
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Slow</span>
+              <span>Fast</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
