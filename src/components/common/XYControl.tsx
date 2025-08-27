@@ -21,6 +21,10 @@ export interface XYControlProps {
   gridColor?: string;
   /** Background color (default: '#f9fafb') */
   backgroundColor?: string;
+  /** Title for X axis (displayed at bottom) */
+  xTitle?: string;
+  /** Title for Y axis (displayed on left side) */
+  yTitle?: string;
 }
 
 export interface XYControlValue {
@@ -38,6 +42,8 @@ const XYControl: React.FC<XYControlProps> = ({
   pointColor = '#3b82f6',
   gridColor = '#e5e7eb',
   backgroundColor = '#f9fafb',
+  xTitle,
+  yTitle,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -238,16 +244,15 @@ const XYControl: React.FC<XYControlProps> = ({
           strokeWidth="2"
         />
 
-        {/* Center crosshairs */}
+        {/* Center axis lines */}
         <line
           x1={SVG_SIZE / 2}
           y1={0}
           x2={SVG_SIZE / 2}
           y2={SVG_SIZE}
           stroke={gridColor}
-          strokeWidth="1"
-          opacity="0.3"
-          strokeDasharray="5,5"
+          strokeWidth="2"
+          opacity="0.6"
         />
         <line
           x1={0}
@@ -255,9 +260,8 @@ const XYControl: React.FC<XYControlProps> = ({
           x2={SVG_SIZE}
           y2={SVG_SIZE / 2}
           stroke={gridColor}
-          strokeWidth="1"
-          opacity="0.3"
-          strokeDasharray="5,5"
+          strokeWidth="2"
+          opacity="0.6"
         />
 
         {/* Control point */}
@@ -287,6 +291,37 @@ const XYControl: React.FC<XYControlProps> = ({
         >
           X: {position.x.toFixed(3)}, Y: {position.y.toFixed(3)}
         </text>
+
+        {/* X-axis title */}
+        {xTitle && (
+          <text
+            x={SVG_SIZE / 2}
+            y={SVG_SIZE - 25}
+            fill="#666"
+            fontSize="14"
+            fontWeight="500"
+            textAnchor="middle"
+            className="pointer-events-none select-none"
+          >
+            {xTitle}
+          </text>
+        )}
+
+        {/* Y-axis title */}
+        {yTitle && (
+          <text
+            x={20}
+            y={SVG_SIZE / 2}
+            fill="#666"
+            fontSize="14"
+            fontWeight="500"
+            textAnchor="middle"
+            transform={`rotate(-90, 20, ${SVG_SIZE / 2})`}
+            className="pointer-events-none select-none"
+          >
+            {yTitle}
+          </text>
+        )}
       </svg>
     </div>
   );

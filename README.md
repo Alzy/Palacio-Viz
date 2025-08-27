@@ -34,5 +34,8 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 `/pre-tint`: (float[3]; range: 0-1;)
 `/pre-zoom`: (float[2]; range: 0-1; default: 0.0)
 `/pre-pan`: (float[2]; range: 0-1; default: 0.0)
+`/pre-brightness-contrast`: (float[2]; range: 0-1; default: 0.0)
 `/post-tint`: (float[3]; range: 0-1;)
+`/post-zoom`: (float[2]; range: 0-1; default: 0.0)
 `/post-pan`: (float[2]; range: 0-1; default: 0.0)
+`/post-brightness-contrast`: (float[2]; range: 0-1; default: 0.0)

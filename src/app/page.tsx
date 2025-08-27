@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useOSC } from '@/hooks/useOSC';
-import XYControl from '@/components/XYControl';
+import XYControl from '@/components/common/XYControl';
+import PromptMixer from '@/components/PromptMixer';
 
 export default function Home() {
   const { isConnected, connectionStatus, bridgeInfo, error, connect, disconnect, send } = useOSC();
@@ -36,6 +37,10 @@ export default function Home() {
 
   const sendXYValue = (x: number, y: number) => {
     send('/xy', x, y);
+  };
+
+  const sendPromptMix = (leftPrompt: string, rightPrompt: string, bias: number) => {
+    send('/prompt', leftPrompt, rightPrompt, bias);
   };
 
   const getStatusColor = () => {
@@ -196,9 +201,29 @@ export default function Home() {
                   onChange={sendXYValue}
                   disabled={!isConnected}
                   className="border-2 border-gray-200 rounded-lg"
+                  xTitle="Horizontal"
+                  yTitle="Vertical"
                 />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Prompt Mixer */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Prompt Mixer</h2>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Enter prompts on both sides and use the slider to bias between them (sends to /prompt)
+            </p>
+            <PromptMixer
+              onChange={sendPromptMix}
+              disabled={!isConnected}
+              leftLabel="Left Prompt"
+              rightLabel="Right Prompt"
+              leftPlaceholder="Enter your left prompt here..."
+              rightPlaceholder="Enter your right prompt here..."
+            />
           </div>
         </div>
 
