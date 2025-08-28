@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import XYControl from '@/components/common/XYControl';
 import Knob from '@/components/common/Knob';
 import { useFeedbackStore } from '@/store/feedbackStore';
@@ -20,7 +20,6 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   const brightnessContrast = useFeedbackStore((state) => state.brightnessContrast);
   const blackLevel = useFeedbackStore((state) => state.blackLevel);
   const saturation = useFeedbackStore((state) => state.saturation);
-  const lastChangeSource = useFeedbackStore((state) => state.lastChangeSource);
 
   // Actions - use stable selectors to prevent recreation
   const setBrightnessContrast = useFeedbackStore(useCallback((state) => state.setBrightnessContrast, []));
@@ -32,14 +31,9 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   const brightnessContrastLiveRef = useRef(brightnessContrast);
   const brightnessContrastInteractingRef = useRef(false);
 
-  // ----- Knob Controls: dual-mode controls -----
+  // ----- Knob Controls: simple controlled -----
   const [uiBlackLevel, setUiBlackLevel] = useState(blackLevel);
-  const blackLevelLiveRef = useRef(blackLevel);
-  const [blackLevelInteracting, setBlackLevelInteracting] = useState(false);
-
   const [uiSaturation, setUiSaturation] = useState(saturation);
-  const saturationLiveRef = useRef(saturation);
-  const [saturationInteracting, setSaturationInteracting] = useState(false);
 
   // Sync controls from store when not interacting
   useEffect(() => {
@@ -74,14 +68,14 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
     setBrightnessContrast(value.x, value.y);
   }, [setBrightnessContrast]);
 
-  // Knob Controls: simple pattern (MyKnobHeadless handles state internally)
+  // Knob Controls: clean and simple
   const handleBlackLevelChange = useCallback((value: number) => {
     onSend('/feedback/black_level', value);
   }, [onSend]);
 
   const handleBlackLevelEnd = useCallback((value: number) => {
-    setUiBlackLevel(value);   // Update UI state
-    setBlackLevel(value);     // ✅ commit to store
+    setUiBlackLevel(value);
+    setBlackLevel(value);
   }, [setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
@@ -89,16 +83,14 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   }, [onSend]);
 
   const handleSaturationEnd = useCallback((value: number) => {
-    setUiSaturation(value);   // Update UI state
-    setSaturation(value);     // ✅ commit to store
+    setUiSaturation(value);
+    setSaturation(value);
   }, [setSaturation]);
 
-  // Dual-mode control props
+  // Dual-mode control props for XYControl
   const brightnessContrastControlledProps = !brightnessContrastInteractingRef.current
     ? { value: uiBrightnessContrast }
     : {};
-
-
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode }> = ({ title, description, children }) => (
     <div className="bg-card rounded-lg shadow-md p-4 flex flex-col">
