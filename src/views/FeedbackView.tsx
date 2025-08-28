@@ -32,9 +32,14 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   const brightnessContrastLiveRef = useRef(brightnessContrast);
   const brightnessContrastInteractingRef = useRef(false);
 
-  // ----- Knob Controls: simpler responsive pattern -----
+  // ----- Knob Controls: dual-mode controls -----
   const [uiBlackLevel, setUiBlackLevel] = useState(blackLevel);
+  const blackLevelLiveRef = useRef(blackLevel);
+  const [blackLevelInteracting, setBlackLevelInteracting] = useState(false);
+
   const [uiSaturation, setUiSaturation] = useState(saturation);
+  const saturationLiveRef = useRef(saturation);
+  const [saturationInteracting, setSaturationInteracting] = useState(false);
 
   // Sync controls from store when not interacting
   useEffect(() => {
@@ -45,12 +50,18 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   }, [brightnessContrast]);
 
   useEffect(() => {
-    setUiBlackLevel(blackLevel);
-  }, [blackLevel]);
+    if (!blackLevelInteracting) {
+      setUiBlackLevel(blackLevel);
+      blackLevelLiveRef.current = blackLevel;
+    }
+  }, [blackLevel, blackLevelInteracting]);
 
   useEffect(() => {
-    setUiSaturation(saturation);
-  }, [saturation]);
+    if (!saturationInteracting) {
+      setUiSaturation(saturation);
+      saturationLiveRef.current = saturation;
+    }
+  }, [saturation, saturationInteracting]);
 
   // XY Control: dual-mode pattern
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
@@ -69,23 +80,36 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
     setBrightnessContrast(value.x, value.y);
   }, [setBrightnessContrast]);
 
-  // Knob Controls: immediate update pattern (knobs don't support uncontrolled mode)
+  // Knob Controls: dual-mode pattern
   const handleBlackLevelChange = useCallback((value: number) => {
-    setUiBlackLevel(value);
-    setBlackLevel(value);
     onSend('/feedback/black_level', value);
-  }, [onSend, setBlackLevel]);
+    blackLevelLiveRef.current = value;
+    setUiBlackLevel(value); // Always update UI state to feed back to knob
+  }, [onSend]);
+
+  const handleBlackLevelEnd = useCallback(() => {
+    setBlackLevelInteracting(false);
+    const v = blackLevelLiveRef.current;
+    setBlackLevel(v);         // ✅ commit to store
+  }, [setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
-    setUiSaturation(value);
-    setSaturation(value);
     onSend('/feedback/saturation', value);
-  }, [onSend, setSaturation]);
+    saturationLiveRef.current = value;
+    setUiSaturation(value); // Always update UI state to feed back to knob
+  }, [onSend]);
+
+  const handleSaturationEnd = useCallback(() => {
+    setSaturationInteracting(false);
+    const v = saturationLiveRef.current;
+    setSaturation(v);         // ✅ commit to store
+  }, [setSaturation]);
 
   // Dual-mode control props
   const brightnessContrastControlledProps = !brightnessContrastInteractingRef.current
     ? { value: uiBrightnessContrast }
     : {};
+
 
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode }> = ({ title, description, children }) => (
@@ -126,13 +150,17 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
           title="Black Level"
           description="Controls the black point. Sends to /feedback/black_level"
         >
-          <div className="w-full h-full flex items-center justify-center">
+          <div
+            className="w-full h-full flex items-center justify-center"
+            onPointerDownCapture={() => { setBlackLevelInteracting(true); }}
+            onPointerUpCapture={handleBlackLevelEnd}
+            onPointerCancelCapture={handleBlackLevelEnd}
+          >
             <Knob
-              value={uiBlackLevel}
-              onChange={handleBlackLevelChange}
-              min={0}
-              max={1}
-              step={0.01}
+              valueRaw={blackLevelInteracting ? blackLevelLiveRef.current : uiBlackLevel}
+              onValueRawChange={handleBlackLevelChange}
+              valueMin={0}
+              valueMax={1}
               disabled={!isConnected}
               size={120}
             />
@@ -142,13 +170,17 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
           title="Saturation"
           description="Controls the color intensity. Sends to /feedback/saturation"
         >
-          <div className="w-full h-full flex items-center justify-center">
+          <div
+            className="w-full h-full flex items-center justify-center"
+            onPointerDownCapture={() => { setSaturationInteracting(true); }}
+            onPointerUpCapture={handleSaturationEnd}
+            onPointerCancelCapture={handleSaturationEnd}
+          >
             <Knob
-              value={uiSaturation}
-              onChange={handleSaturationChange}
-              min={0}
-              max={2}
-              step={0.01}
+              valueRaw={saturationInteracting ? saturationLiveRef.current : uiSaturation}
+              onValueRawChange={handleSaturationChange}
+              valueMin={0}
+              valueMax={2}
               disabled={!isConnected}
               size={120}
             />
