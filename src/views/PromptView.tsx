@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import PromptMixer from '@/components/PromptMixer';
 import PromptHistory from '@/components/PromptHistory';
+import { usePromptStore } from '@/store/promptStore';
 
 interface PromptViewProps {
   /** Whether the OSC connection is active */
@@ -11,51 +12,85 @@ interface PromptViewProps {
   onSend: (address: string, ...args: any[]) => void;
 }
 
+const STORAGE_KEY = 'prompt-history';
+
 const PromptView: React.FC<PromptViewProps> = ({ isConnected, onSend }) => {
+  const {
+    leftPrompt,
+    rightPrompt,
+    currentBias,
+    seedTravelSpeed,
+    setLeftPrompt,
+    setRightPrompt,
+    setBias,
+    setSeedTravelSpeed,
+    setPrompts
+  } = usePromptStore();
+  
   const [promptHistory, setPromptHistory] = useState<string[]>([]);
-  const [leftPrompt, setLeftPrompt] = useState('');
-  const [rightPrompt, setRightPrompt] = useState('');
-  const [currentBias, setCurrentBias] = useState(0.5);
-  const [seedTravelSpeed, setSeedTravelSpeed] = useState(0.5);
+
+  // Load history from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setPromptHistory(parsed);
+      }
+    } catch (error) {
+      console.error('Failed to load prompt history:', error);
+    }
+  }, []);
+
+  // Save history to localStorage whenever it changes
+  const saveToStorage = useCallback((history: string[]) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch (error) {
+      console.error('Failed to save prompt history:', error);
+    }
+  }, []);
 
   // Add unique prompt to history
   const addToHistory = useCallback((prompt: string) => {
     if (prompt.trim() && !promptHistory.includes(prompt.trim())) {
-      setPromptHistory(prev => [prompt.trim(), ...prev]);
+      const newHistory = [prompt.trim(), ...promptHistory];
+      setPromptHistory(newHistory);
+      saveToStorage(newHistory);
     }
-  }, [promptHistory]);
+  }, [promptHistory, saveToStorage]);
 
-  const handlePromptMix = (leftPrompt: string, rightPrompt: string, bias: number) => {
-    setCurrentBias(bias);
+  const handlePromptMix = useCallback((leftPrompt: string, rightPrompt: string, bias: number) => {
+    setPrompts(leftPrompt, rightPrompt, bias);
     onSend('/prompt', leftPrompt, rightPrompt, bias);
-  };
+  }, [setPrompts, onSend]);
 
-  const handleSeedTravelSpeedChange = (speed: number) => {
+  const handleSeedTravelSpeedChange = useCallback((speed: number) => {
     setSeedTravelSpeed(speed);
     onSend('/seed_travel_speed', speed);
-  };
+  }, [setSeedTravelSpeed, onSend]);
 
   const handleLeftPromptChange = useCallback((prompt: string) => {
     setLeftPrompt(prompt);
     addToHistory(prompt);
-  }, [addToHistory]);
+  }, [setLeftPrompt, addToHistory]);
 
   const handleRightPromptChange = useCallback((prompt: string) => {
     setRightPrompt(prompt);
     addToHistory(prompt);
-  }, [addToHistory]);
+  }, [setRightPrompt, addToHistory]);
 
   const handleSelectLeftFromHistory = useCallback((prompt: string) => {
     setLeftPrompt(prompt);
     // Also trigger OSC message with updated prompt, preserving current bias
     handlePromptMix(prompt, rightPrompt, currentBias);
-  }, [rightPrompt, currentBias, handlePromptMix]);
+  }, [setLeftPrompt, rightPrompt, currentBias, handlePromptMix]);
 
   const handleSelectRightFromHistory = useCallback((prompt: string) => {
     setRightPrompt(prompt);
     // Also trigger OSC message with updated prompt, preserving current bias
     handlePromptMix(leftPrompt, prompt, currentBias);
-  }, [leftPrompt, currentBias, handlePromptMix]);
+  }, [setRightPrompt, leftPrompt, currentBias, handlePromptMix]);
 
   return (
     <div className="h-full flex flex-col space-y-6">

@@ -3,12 +3,12 @@
 import React, { useRef, useCallback, useEffect, useState } from 'react';
 
 export interface XYControlProps {
-  /** Initial X value (0-1, default: 0.5) */
-  initialX?: number;
-  /** Initial Y value (0-1, default: 0.5) */
-  initialY?: number;
+  /** Initial value (default: {x: 0.5, y: 0.5}) - used only when value prop is not provided */
+  initialValue?: { x: number; y: number };
+  /** Controlled value - when provided, component becomes controlled */
+  value?: { x: number; y: number };
   /** Callback fired when values change */
-  onChange?: (x: number, y: number) => void;
+  onChange?: (value: { x: number; y: number }) => void;
   /** Custom class name */
   className?: string;
   /** Whether the control is disabled */
@@ -27,14 +27,9 @@ export interface XYControlProps {
   yTitle?: string;
 }
 
-export interface XYControlValue {
-  x: number;
-  y: number;
-}
-
 const XYControl: React.FC<XYControlProps> = ({
-  initialX = 0.5,
-  initialY = 0.5,
+  initialValue = { x: 0.5, y: 0.5 },
+  value,
   onChange,
   className = '',
   disabled = false,
@@ -46,169 +41,86 @@ const XYControl: React.FC<XYControlProps> = ({
   yTitle,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const isControlled = value !== undefined;
+  
   const [isDragging, setIsDragging] = useState(false);
-  const [position, setPosition] = useState({ x: initialX, y: initialY });
-  const [inputType, setInputType] = useState<'mouse' | 'touch' | null>(null);
+  const [displayPosition, setDisplayPosition] = useState(value ?? initialValue);
 
-  // Fixed dimensions for consistent coordinate mapping
-  const SVG_SIZE = 300;
+  const isDraggingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
+  const rectRef = useRef<DOMRect | null>(null);
 
-  // Convert screen coordinates to normalized values (0-1)
-  const screenToNormalized = useCallback((clientX: number, clientY: number) => {
-    if (!svgRef.current) return { x: 0.5, y: 0.5 };
-
-    const rect = svgRef.current.getBoundingClientRect();
-
-    // Calculate relative position within the actual rendered SVG
-    const relativeX = (clientX - rect.left) / rect.width;
-    const relativeY = (clientY - rect.top) / rect.height;
-
-    // Clamp to bounds and invert Y axis
-    const x = Math.max(0, Math.min(1, relativeX));
-    const y = Math.max(0, Math.min(1, 1 - relativeY)); // Invert Y axis
-
+  // Sync with external value, but only when not dragging.
+  useEffect(() => {
+    if (isControlled && !isDragging) {
+      setDisplayPosition(value);
+    }
+  }, [value, isControlled, isDragging]);
+  
+  const getPosFromClient = (clientX: number, clientY: number) => {
+    const r = rectRef.current;
+    if (!r) return { x: 0.5, y: 0.5 }; // Fallback, should not happen in practice
+    const x = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+    const y = Math.max(0, Math.min(1, 1 - (clientY - r.top) / r.height));
     return { x, y };
-  }, []);
+  };
 
-  // Convert normalized values to SVG coordinates
-  const normalizedToSVG = useCallback((x: number, y: number) => {
-    return {
-      x: x * SVG_SIZE,
-      y: (1 - y) * SVG_SIZE, // Invert Y axis for SVG
-    };
-  }, []);
+  const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (disabled || !svgRef.current) return;
+    e.preventDefault();
 
-  // Handle position updates
-  const updatePosition = useCallback((newX: number, newY: number) => {
-    const clampedX = Math.max(0, Math.min(1, newX));
-    const clampedY = Math.max(0, Math.min(1, newY));
+    // cache rect once; avoids jitter during store-triggered rerenders
+    rectRef.current = svgRef.current.getBoundingClientRect();
 
-    setPosition({ x: clampedX, y: clampedY });
-    onChange?.(clampedX, clampedY);
+    // capture pointer so we keep move/up even if DOM rerenders
+    svgRef.current.setPointerCapture(e.pointerId);
+    activePointerIdRef.current = e.pointerId;
+
+    isDraggingRef.current = true;
+    setIsDragging(true);
+
+    const p = getPosFromClient(e.clientX, e.clientY);
+    setDisplayPosition(p);
+    onChange?.(p);
+  }, [disabled, onChange]); // ✅ stable during drag
+
+  const onPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    if (!isDraggingRef.current || e.pointerId !== activePointerIdRef.current) return;
+    const p = getPosFromClient(e.clientX, e.clientY);
+    setDisplayPosition(p);
+    onChange?.(p);
   }, [onChange]);
 
-  // Mouse event handlers
-  const handleMouseDown = useCallback((event: React.MouseEvent) => {
-    if (disabled || inputType === 'touch') return; // Ignore if touch is active
-
-    event.preventDefault();
-    setInputType('mouse');
-    setIsDragging(true);
-
-    const { x, y } = screenToNormalized(event.clientX, event.clientY);
-    updatePosition(x, y);
-  }, [disabled, inputType, screenToNormalized, updatePosition]);
-
-  const handleMouseMove = useCallback((event: MouseEvent) => {
-    if (!isDragging || disabled || inputType !== 'mouse') return;
-
-    event.preventDefault();
-    const { x, y } = screenToNormalized(event.clientX, event.clientY);
-    updatePosition(x, y);
-  }, [isDragging, disabled, inputType, screenToNormalized, updatePosition]);
-
-  const handleMouseUp = useCallback((event: MouseEvent) => {
-    if (!isDragging || inputType !== 'mouse') return;
-
-    event.preventDefault();
+  const endDrag = useCallback((e?: React.PointerEvent<SVGSVGElement>) => {
+    if (!isDraggingRef.current) return;
+    try {
+      if (e && svgRef.current && typeof e.pointerId === 'number') {
+        svgRef.current.releasePointerCapture(e.pointerId);
+      }
+    } catch {}
+    isDraggingRef.current = false;
+    activePointerIdRef.current = null;
+    rectRef.current = null;
     setIsDragging(false);
-    // Reset input type after a delay to allow for any remaining mouse events
-    setTimeout(() => setInputType(null), 100);
-  }, [isDragging, inputType]);
+  }, []);
+  
+  const SVG_SIZE = 300;
+  const normalizedToSVG = (x: number, y: number) => ({ x: x * SVG_SIZE, y: (1 - y) * SVG_SIZE });
+  const svgPosition = normalizedToSVG(displayPosition.x, displayPosition.y);
 
-  // Touch event handlers
-  const handleTouchStart = useCallback((event: React.TouchEvent) => {
-    if (disabled) return;
-
-    event.preventDefault();
-    setInputType('touch');
-    setIsDragging(true);
-
-    const touch = event.touches[0];
-    const { x, y } = screenToNormalized(touch.clientX, touch.clientY);
-    updatePosition(x, y);
-  }, [disabled, screenToNormalized, updatePosition]);
-
-  const handleTouchMove = useCallback((event: TouchEvent) => {
-    if (!isDragging || disabled || inputType !== 'touch') return;
-
-    event.preventDefault();
-    const touch = event.touches[0];
-    const { x, y } = screenToNormalized(touch.clientX, touch.clientY);
-    updatePosition(x, y);
-  }, [isDragging, disabled, inputType, screenToNormalized, updatePosition]);
-
-  const handleTouchEnd = useCallback((event: TouchEvent) => {
-    if (!isDragging || inputType !== 'touch') return;
-
-    event.preventDefault();
-    setIsDragging(false);
-    // Reset input type after a delay to prevent ghost mouse events
-    setTimeout(() => setInputType(null), 300);
-  }, [isDragging, inputType]);
-
-  // Global event listeners for drag operations
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove, { passive: false });
-      document.addEventListener('mouseup', handleMouseUp, { passive: false });
-      document.addEventListener('touchmove', handleTouchMove, { passive: false });
-      document.addEventListener('touchend', handleTouchEnd, { passive: false });
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('touchend', handleTouchEnd);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
-
-  // Generate grid lines
   const generateGridLines = () => {
     const lines = [];
     const step = 1 / (gridLines + 1);
-
     for (let i = 1; i <= gridLines; i++) {
-      const pos = i * step;
-
-      // Vertical lines
-      lines.push(
-        <line
-          key={`v-${i}`}
-          x1={pos * SVG_SIZE}
-          y1={0}
-          x2={pos * SVG_SIZE}
-          y2={SVG_SIZE}
-          className="stroke-foreground"
-          strokeWidth="1"
-          opacity="0.2"
-        />
-      );
-
-      // Horizontal lines
-      lines.push(
-        <line
-          key={`h-${i}`}
-          x1={0}
-          y1={pos * SVG_SIZE}
-          x2={SVG_SIZE}
-          y2={pos * SVG_SIZE}
-          className="stroke-foreground"
-          strokeWidth="1"
-          opacity="0.2"
-        />
-      );
+        const pos = i * step * SVG_SIZE;
+        lines.push(<line key={`v-${i}`} x1={pos} y1={0} x2={pos} y2={SVG_SIZE} className="stroke-foreground" strokeWidth="1" opacity="0.2" />);
+        lines.push(<line key={`h-${i}`} x1={0} y1={pos} x2={SVG_SIZE} y2={pos} className="stroke-foreground" strokeWidth="1" opacity="0.2" />);
     }
-
     return lines;
   };
 
-  const svgPosition = normalizedToSVG(position.x, position.y);
-
   return (
-    <div ref={containerRef} className={`w-full h-full min-h-[200px] ${className}`}>
+    <div className={`w-full h-full min-h-[200px] ${className}`}>
       <svg
         ref={svgRef}
         width="100%"
@@ -216,105 +128,36 @@ const XYControl: React.FC<XYControlProps> = ({
         viewBox={`0 0 ${SVG_SIZE} ${SVG_SIZE}`}
         preserveAspectRatio="xMidYMid meet"
         className={`border border-border rounded-lg cursor-${disabled ? 'not-allowed' : 'crosshair'} select-none touch-none`}
-        style={{
-          backgroundColor,
-          aspectRatio: '1',
-          maxWidth: '100%',
-          maxHeight: '100%',
-        }}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
+        style={{ backgroundColor, aspectRatio: '1', maxWidth: '100%', maxHeight: '100%' }}
+        onPointerDownCapture={onPointerDown}
+        onPointerMoveCapture={onPointerMove}
+        onPointerUpCapture={endDrag}
+        onPointerCancelCapture={endDrag}
+        onLostPointerCapture={endDrag}
       >
-        {/* Background */}
-        <rect
-          width={SVG_SIZE}
-          height={SVG_SIZE}
-          className="fill-muted"
-        />
-
-        {/* Grid lines */}
+        <rect width={SVG_SIZE} height={SVG_SIZE} className="fill-muted" />
         {generateGridLines()}
-
-        {/* Border */}
-        <rect
-          width={SVG_SIZE}
-          height={SVG_SIZE}
-          fill="none"
-          className="stroke-foreground"
-          strokeWidth="1"
-          opacity="0.2"
-        />
-
-        {/* Center axis lines */}
-        <line
-          x1={SVG_SIZE / 2}
-          y1={0}
-          x2={SVG_SIZE / 2}
-          y2={SVG_SIZE}
-          className="stroke-foreground"
-          strokeWidth="1"
-          opacity="0.4"
-        />
-        <line
-          x1={0}
-          y1={SVG_SIZE / 2}
-          x2={SVG_SIZE}
-          y2={SVG_SIZE / 2}
-          className="stroke-foreground"
-          strokeWidth="1"
-          opacity="0.4"
-        />
-
-        {/* Control point */}
+        <rect width={SVG_SIZE} height={SVG_SIZE} fill="none" className="stroke-foreground" strokeWidth="1" opacity="0.2" />
+        <line x1={SVG_SIZE/2} y1={0} x2={SVG_SIZE/2} y2={SVG_SIZE} className="stroke-foreground" strokeWidth="1" opacity="0.4" />
+        <line x1={0} y1={SVG_SIZE/2} x2={SVG_SIZE} y2={SVG_SIZE/2} className="stroke-foreground" strokeWidth="1" opacity="0.4" />
         <circle
           cx={svgPosition.x}
           cy={svgPosition.y}
           r="10"
-          className={`${disabled ? 'opacity-50' : ''} transition-transform duration-150 fill-primary stroke-background`}
+          className={`${disabled ? 'opacity-50' : ''} fill-primary stroke-background`}
           strokeWidth="3"
-          style={{
-            filter: isDragging
-              ? 'drop-shadow(0 6px 12px rgba(0,0,0,0.3))'
-              : 'drop-shadow(0 3px 6px rgba(0,0,0,0.15))',
-          }}
+          style={{ transition: 'transform 0.05s ease-out', transform: isDragging ? 'scale(1.1)' : 'scale(1)' }}
         />
-
-        {/* Value display */}
-        <text
-          x={10}
-          y={SVG_SIZE - 10}
-          className="pointer-events-none select-none fill-muted-foreground"
-          fontSize="11"
-          fontFamily="monospace"
-        >
-          X: {position.x.toFixed(3)}, Y: {position.y.toFixed(3)}
+        <text x={10} y={SVG_SIZE - 10} className="pointer-events-none select-none fill-muted-foreground" fontSize="11" fontFamily="monospace">
+          X: {displayPosition.x.toFixed(3)}, Y: {displayPosition.y.toFixed(3)}
         </text>
-
-        {/* X-axis title */}
         {xTitle && (
-          <text
-            x={SVG_SIZE / 2}
-            y={SVG_SIZE - 25}
-            className="pointer-events-none select-none fill-muted-foreground"
-            fontSize="14"
-            fontWeight="500"
-            textAnchor="middle"
-          >
+          <text x={SVG_SIZE / 2} y={SVG_SIZE - 25} className="pointer-events-none select-none fill-muted-foreground" fontSize="14" fontWeight="500" textAnchor="middle">
             {xTitle}
           </text>
         )}
-
-        {/* Y-axis title */}
         {yTitle && (
-          <text
-            x={20}
-            y={SVG_SIZE / 2}
-            fontSize="14"
-            fontWeight="500"
-            textAnchor="middle"
-            transform={`rotate(-90, 20, ${SVG_SIZE / 2})`}
-            className="pointer-events-none select-none fill-muted-foreground"
-          >
+          <text x={20} y={SVG_SIZE / 2} fontSize="14" fontWeight="500" textAnchor="middle" transform={`rotate(-90, 20, ${SVG_SIZE / 2})`} className="pointer-events-none select-none fill-muted-foreground">
             {yTitle}
           </text>
         )}

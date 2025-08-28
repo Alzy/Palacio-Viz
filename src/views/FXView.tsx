@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import XYControl from '@/components/common/XYControl';
 import Knob from '@/components/common/Knob';
 import {
@@ -9,7 +9,7 @@ import {
   ColorPickerHue,
   ColorPickerAlpha
 } from '@/components/ui/shadcn-io/color-picker';
-import {bgWhite} from "next/dist/lib/picocolors";
+import { usePreFXStore, usePostFXStore } from '@/store/fxStore';
 
 interface FXViewProps {
   /** Whether the OSC connection is active */
@@ -25,49 +25,88 @@ const FXView: React.FC<FXViewProps> = ({
   onSend,
   fxType,
 }) => {
-  const [blackLevel, setBlackLevel] = useState(0);
-  const [saturation, setSaturation] = useState(1);
-  const [tintColor, setTintColor] = useState('#ff0000'); // Default red for visibility
+  const useStore = fxType === 'pre' ? usePreFXStore : usePostFXStore;
   
-  // Use refs to avoid re-renders during drag operations
-  const blackLevelRef = useRef(blackLevel);
-  const saturationRef = useRef(saturation);
+  // Use atomic selectors to minimize re-renders (following strategy doc)
+  const brightnessContrast = useStore((state) => state.brightnessContrast);
+  const zoom = useStore((state) => state.zoom);
+  const pan = useStore((state) => state.pan);
+  const blackLevel = useStore((state) => state.blackLevel);
+  const saturation = useStore((state) => state.saturation);
+  const tintColor = useStore((state) => state.tintColor);
+  const lastChangeSource = useStore((state) => state.lastChangeSource);
+  
+  // Get store actions
+  const setBrightnessContrast = useStore((state) => state.setBrightnessContrast);
+  const setZoom = useStore((state) => state.setZoom);
+  const setPan = useStore((state) => state.setPan);
+  const setBlackLevel = useStore((state) => state.setBlackLevel);
+  const setSaturation = useStore((state) => state.setSaturation);
+  const setTintColor = useStore((state) => state.setTintColor);
 
-  const handleBrightnessContrastChange = useCallback((x: number, y: number) => {
-    onSend(`/${fxType}/brightness_contrast`, x, y);
-  }, [fxType, onSend]);
+  // Following the transient updates pattern from the strategy document:
+  // Use a ref to track the current color and subscribe to store changes
+  // to update the ColorPicker without causing re-renders
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+  const currentTintRef = useRef(tintColor);
+  const [colorPickerKey, setColorPickerKey] = useState(0);
+  
+  // Subscribe to store changes for transient updates (strategy doc pattern)
+  useEffect(() => {
+    const unsubscribe = useStore.subscribe((state) => {
+      // Only update if the color actually changed and it was an external change
+      if (state.tintColor !== currentTintRef.current && state.lastChangeSource === 'recall') {
+        currentTintRef.current = state.tintColor;
+        // Force ColorPicker remount only for external changes (like presets)
+        setColorPickerKey(prev => prev + 1);
+      }
+    });
+    
+    return unsubscribe;
+  }, [useStore]);
 
-  const handleZoomChange = useCallback((x: number, y: number) => {
-    onSend(`/${fxType}/zoom`, x, y);
-  }, [fxType, onSend]);
+  // Simplified onChange handler following strategy doc recommendations
+  const handleTintChange = useCallback((rgba: number[]) => {
+    const r = Math.round(rgba[0]);
+    const g = Math.round(rgba[1]);
+    const b = Math.round(rgba[2]);
+    const a = rgba[3] ?? 1.0;
+    const hexColor = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+    
+    // Update ref immediately to prevent feedback loops
+    currentTintRef.current = hexColor;
+    
+    // Update store with user source
+    setTintColor(hexColor, 'user');
+    
+    // Send OSC message
+    onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
+  }, [fxType, onSend, setTintColor]);
 
-  const handlePanChange = useCallback((x: number, y: number) => {
-    onSend(`/${fxType}/pan`, x, y);
-  }, [fxType, onSend]);
+  const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
+    setBrightnessContrast(value.x, value.y);
+    onSend(`/${fxType}/brightness_contrast`, value.x, value.y);
+  }, [fxType, onSend, setBrightnessContrast]);
+
+  const handleZoomChange = useCallback((value: { x: number; y: number }) => {
+    setZoom(value.x, value.y);
+    onSend(`/${fxType}/zoom`, value.x, value.y);
+  }, [fxType, onSend, setZoom]);
+
+  const handlePanChange = useCallback((value: { x: number; y: number }) => {
+    setPan(value.x, value.y);
+    onSend(`/${fxType}/pan`, value.x, value.y);
+  }, [fxType, onSend, setPan]);
 
   const handleBlackLevelChange = useCallback((value: number) => {
-    blackLevelRef.current = value;
     setBlackLevel(value);
     onSend(`/${fxType}/black_level`, value);
-  }, [fxType, onSend]);
+  }, [fxType, onSend, setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
-    saturationRef.current = value;
     setSaturation(value);
     onSend(`/${fxType}/saturation`, value);
-  }, [fxType, onSend]);
-
-  const handleTintChange = useCallback((rgba: any) => {
-    // rgba comes as [r, g, b, a] where r,g,b are 0-255 and a is 0-1
-    const normalizedRgba = [
-      rgba[0] / 255,
-      rgba[1] / 255,
-      rgba[2] / 255,
-      rgba[3] // Alpha is already 0-1
-    ];
-    
-    onSend(`/${fxType}/tint`, ...normalizedRgba);
-  }, [fxType, onSend]);
+  }, [fxType, onSend, setSaturation]);
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode; className?: string; }> = ({ title, description, children, className }) => (
     <div className={`bg-card rounded-lg shadow-md p-4 flex flex-col ${className}`}>
@@ -88,6 +127,7 @@ const FXView: React.FC<FXViewProps> = ({
           >
             <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
               <XYControl
+                value={brightnessContrast}
                 onChange={handleBrightnessContrastChange}
                 disabled={!isConnected}
                 xTitle="Brightness"
@@ -103,20 +143,22 @@ const FXView: React.FC<FXViewProps> = ({
             className={`h-full`}
           >
             <div className="w-full h-full min-h-[200px] p-4">
-              <ColorPicker
-                defaultValue="#ff0000"
-                onChange={handleTintChange}
-                className="w-full h-full"
-              >
+              <div ref={colorPickerRef}>
+                <ColorPicker
+                  key={`tint-${fxType}-${colorPickerKey}`}
+                  defaultValue={tintColor}
+                  onChange={handleTintChange as any}
+                  className="w-full h-full"
+                >
                 <ColorPickerSelection className={'flex-1'}  />
                 <div className="space-y-2">
                   <ColorPickerHue />
                   <div className={`bg-gray-400`}>
                     <ColorPickerAlpha />
                   </div>
-
                 </div>
-              </ColorPicker>
+                </ColorPicker>
+              </div>
             </div>
           </ControlCard>
         </div>
@@ -171,6 +213,7 @@ const FXView: React.FC<FXViewProps> = ({
           >
             <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
               <XYControl
+                value={zoom}
                 onChange={handleZoomChange}
                 disabled={!isConnected}
                 xTitle="Zoom X"
@@ -186,6 +229,7 @@ const FXView: React.FC<FXViewProps> = ({
           >
             <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
               <XYControl
+                value={pan}
                 onChange={handlePanChange}
                 disabled={!isConnected}
                 xTitle="Pan X"

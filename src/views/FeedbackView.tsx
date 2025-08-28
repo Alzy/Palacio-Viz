@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import XYControl from '@/components/common/XYControl';
 import Knob from '@/components/common/Knob';
+import { useFeedbackStore } from '@/store/feedbackStore';
 
 interface FeedbackViewProps {
   /** Whether the OSC connection is active */
@@ -15,28 +16,29 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   isConnected,
   onSend,
 }) => {
-  const [blackLevel, setBlackLevel] = useState(0);
-  const [saturation, setSaturation] = useState(1);
-  
-  // Use refs to avoid re-renders during drag operations
-  const blackLevelRef = useRef(blackLevel);
-  const saturationRef = useRef(saturation);
+  const {
+    brightnessContrast,
+    blackLevel,
+    saturation,
+    setBrightnessContrast,
+    setBlackLevel,
+    setSaturation
+  } = useFeedbackStore();
 
-  const handleBrightnessContrastChange = useCallback((x: number, y: number) => {
-    onSend('/feedback/brightness_contrast', x, y);
-  }, [onSend]);
+  const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
+    setBrightnessContrast(value.x, value.y);
+    onSend('/feedback/brightness_contrast', value.x, value.y);
+  }, [onSend, setBrightnessContrast]);
 
   const handleBlackLevelChange = useCallback((value: number) => {
-    blackLevelRef.current = value;
     setBlackLevel(value);
     onSend('/feedback/black_level', value);
-  }, [onSend]);
+  }, [onSend, setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
-    saturationRef.current = value;
     setSaturation(value);
     onSend('/feedback/saturation', value);
-  }, [onSend]);
+  }, [onSend, setSaturation]);
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode }> = ({ title, description, children }) => (
     <div className="bg-card rounded-lg shadow-md p-4 flex flex-col">
@@ -56,6 +58,7 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
         >
           <div className="w-full h-full min-h-[400px] aspect-square mx-auto">
             <XYControl
+              value={brightnessContrast}
               onChange={handleBrightnessContrastChange}
               disabled={!isConnected}
               xTitle="Brightness"
