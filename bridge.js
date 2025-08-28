@@ -2,11 +2,12 @@
 const WebSocket = require('ws');
 const osc = require('osc');
 const dgram = require('dgram');
+require('dotenv').config();
 
-// Configuration
-const WEBSOCKET_PORT = 8080;
-const TOUCHDESIGNER_HOST = '127.0.0.1';
-const TOUCHDESIGNER_PORT = 7000; // Default TouchDesigner OSC In port
+// Configuration with environment variable fallbacks
+const WEBSOCKET_PORT = parseInt(process.env.BRIDGE_WEBSOCKET_PORT) || 8080;
+const TOUCHDESIGNER_HOST = process.env.TOUCHDESIGNER_HOST || '127.0.0.1';
+const TOUCHDESIGNER_PORT = parseInt(process.env.TOUCHDESIGNER_PORT) || 7000;
 
 console.log('🌉 Starting OSC WebSocket-to-UDP Bridge...');
 console.log(`📦 Using osc library version: ${require('./node_modules/osc/package.json').version}`);

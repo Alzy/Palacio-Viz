@@ -22,8 +22,8 @@ interface UseOSCOptions {
 
 export const useOSC = (options: UseOSCOptions = {}) => {
   const {
-    bridgeHost = 'localhost',
-    bridgePort = 8080,
+    bridgeHost = process.env.NEXT_PUBLIC_OSC_BRIDGE_HOST || 'localhost',
+    bridgePort = parseInt(process.env.NEXT_PUBLIC_OSC_BRIDGE_PORT || '8080'),
     autoConnect = true,
     reconnectDelay = 3000
   } = options;
