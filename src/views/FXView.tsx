@@ -49,7 +49,9 @@ const FXView: React.FC<FXViewProps> = ({
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const [colorPickerKey, setColorPickerKey] = useState(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isUserInteractingRef = useRef(false);
+  const pendingColorRef = useRef<string | null>(null);
   
   // Subscribe to store changes for external updates (strategy doc pattern)
   useEffect(() => {
@@ -64,28 +66,58 @@ const FXView: React.FC<FXViewProps> = ({
     return unsubscribe;
   }, [useStore]);
 
+  // Silent store update function that doesn't trigger re-renders
+  const silentStoreUpdate = useCallback((hexColor: string) => {
+    // Use the store's direct setter to avoid triggering our subscription
+    const currentState = useStore.getState();
+    if (currentState.tintColor !== hexColor) {
+      // Update store silently without changing lastChangeSource to avoid re-renders
+      useStore.setState({ tintColor: hexColor });
+    }
+  }, [useStore]);
+
   // Debounced store update function (strategy doc: "Consider Debouncing for Commit or Heavy Work")
   const debouncedStoreUpdate = useCallback((hexColor: string) => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
     
+    pendingColorRef.current = hexColor;
+    
     debounceTimeoutRef.current = setTimeout(() => {
-      setTintColor(hexColor, 'user');
+      if (pendingColorRef.current) {
+        // Use silent update to prevent ColorPicker remount after drag ends
+        silentStoreUpdate(pendingColorRef.current);
+        pendingColorRef.current = null;
+      }
       isUserInteractingRef.current = false; // Mark interaction as complete
     }, 300); // 300ms debounce for store updates
-  }, [setTintColor]);
+  }, [silentStoreUpdate]);
 
-  // Cleanup debounce timeout on unmount
+  // Throttled OSC send function for high-frequency updates (strategy doc pattern)
+  const throttledOSCSend = useCallback((r: number, g: number, b: number, a: number) => {
+    if (throttleTimeoutRef.current) {
+      clearTimeout(throttleTimeoutRef.current);
+    }
+    
+    throttleTimeoutRef.current = setTimeout(() => {
+      onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
+    }, 16); // ~60fps throttling for OSC messages
+  }, [fxType, onSend]);
+
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current);
+      }
     };
   }, []);
 
-  // Immediate onChange handler for responsive UI, debounced store updates
+  // Throttled onChange handler to reduce frequency of updates during ColorPickerSelection dragging
   const handleTintChange = useCallback((rgba: number[]) => {
     const r = Math.round(rgba[0]);
     const g = Math.round(rgba[1]);
@@ -96,12 +128,12 @@ const FXView: React.FC<FXViewProps> = ({
     // Mark that user is actively interacting
     isUserInteractingRef.current = true;
     
-    // Send OSC message immediately for real-time control
-    onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
+    // Throttle OSC messages to reduce frequency during dragging
+    throttledOSCSend(r, g, b, a);
     
     // Debounce store updates to reduce reactivity issues
     debouncedStoreUpdate(hexColor);
-  }, [fxType, onSend, debouncedStoreUpdate]);
+  }, [throttledOSCSend, debouncedStoreUpdate]);
 
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
     setBrightnessContrast(value.x, value.y);
