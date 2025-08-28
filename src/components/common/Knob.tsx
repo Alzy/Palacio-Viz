@@ -55,7 +55,7 @@ export function Knob(props: KnobProps) {
         onChangeEnd={onChangeEnd}
         valueMin={valueMin}
         valueMax={valueMax}
-        dragSensitivity={0.01}
+        dragSensitivity={0.00333}
         disabled={disabled}
         aria-label={label || 'Knob control'}
         style={{
