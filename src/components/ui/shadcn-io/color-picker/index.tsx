@@ -96,33 +96,14 @@ export const ColorPicker = ({
     }
   }, [value]);
 
-  // Throttle onChange notifications to reduce frequency during rapid changes
-  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+  // Notify parent of changes immediately like the working ColorMixer pattern
   useEffect(() => {
     if (onChange) {
-      // Clear any pending throttled call
-      if (throttleTimeoutRef.current) {
-        clearTimeout(throttleTimeoutRef.current);
-      }
-      
-      // Throttle onChange calls to ~60fps for smooth performance
-      throttleTimeoutRef.current = setTimeout(() => {
-        const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
-        const rgba = color.rgb().array();
-        onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
-      }, 16); // ~60fps
+      const color = Color.hsl(hue, saturation, lightness).alpha(alpha / 100);
+      const rgba = color.rgb().array();
+      onChange([rgba[0], rgba[1], rgba[2], alpha / 100]);
     }
   }, [hue, saturation, lightness, alpha, onChange]);
-
-  // Cleanup throttle timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (throttleTimeoutRef.current) {
-        clearTimeout(throttleTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <ColorPickerContext.Provider

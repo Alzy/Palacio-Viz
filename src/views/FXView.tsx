@@ -44,10 +44,8 @@ const FXView: React.FC<FXViewProps> = ({
   const setSaturation = useStore((state) => state.setSaturation);
   const setTintColor = useStore((state) => state.setTintColor);
 
-  // Optimized reactivity pattern with throttled OSC and debounced store updates
+  // Use the exact same pattern as ColorMixer - immediate updates, no throttling/debouncing
   const tintKeyRef = useRef(0);
-  const oscThrottleRef = useRef<NodeJS.Timeout | null>(null);
-  const storeDebounceRef = useRef<NodeJS.Timeout | null>(null);
   
   // Update key when colors change from recalls - ONLY depend on lastChangeSource
   useEffect(() => {
@@ -56,15 +54,7 @@ const FXView: React.FC<FXViewProps> = ({
     }
   }, [lastChangeSource]);
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (oscThrottleRef.current) clearTimeout(oscThrottleRef.current);
-      if (storeDebounceRef.current) clearTimeout(storeDebounceRef.current);
-    };
-  }, []);
-
-  // Optimized onChange handler with throttled OSC and debounced store updates
+  // Simple onChange handler - immediate store update and OSC like ColorMixer
   const handleTintChange = useCallback((rgba: number[]) => {
     const r = Math.round(rgba[0]);
     const g = Math.round(rgba[1]);
@@ -72,17 +62,11 @@ const FXView: React.FC<FXViewProps> = ({
     const a = rgba[3] ?? 1.0;
     const hexColor = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
     
-    // Throttle OSC messages to 60fps for smooth real-time control
-    if (oscThrottleRef.current) clearTimeout(oscThrottleRef.current);
-    oscThrottleRef.current = setTimeout(() => {
-      onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
-    }, 16);
+    // Update store immediately like ColorMixer does
+    setTintColor(hexColor, 'user');
     
-    // Debounce store updates to reduce re-renders while maintaining responsiveness
-    if (storeDebounceRef.current) clearTimeout(storeDebounceRef.current);
-    storeDebounceRef.current = setTimeout(() => {
-      setTintColor(hexColor, 'user');
-    }, 100); // Shorter debounce for better responsiveness
+    // Send OSC immediately
+    onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
   }, [fxType, onSend, setTintColor]);
 
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
