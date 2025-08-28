@@ -185,31 +185,65 @@ export const ColorPickerSelection = memo(
     );
 
     useEffect(() => {
-      const handlePointerUp = () => setIsDragging(false);
+      const handlePointerUp = () => {
+        setIsDragging(false);
+        // Clean up focus on pointer up (especially for touch)
+        if (containerRef.current) {
+          containerRef.current.blur();
+        }
+      };
 
       if (isDragging) {
         window.addEventListener('pointermove', handlePointerMove);
         window.addEventListener('pointerup', handlePointerUp);
+        // Also listen for touch end events
+        window.addEventListener('touchend', handlePointerUp);
+        window.addEventListener('touchcancel', handlePointerUp);
       }
 
       return () => {
         window.removeEventListener('pointermove', handlePointerMove);
         window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('touchend', handlePointerUp);
+        window.removeEventListener('touchcancel', handlePointerUp);
       };
     }, [isDragging, handlePointerMove]);
 
     return (
       <div
-        className={cn('relative size-full cursor-crosshair rounded', className)}
+        className={cn('relative size-full cursor-crosshair rounded touch-none', className)}
         onPointerDown={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           setIsDragging(true);
           handlePointerMove(e.nativeEvent);
+          
+          // Ensure focus is properly managed for touch
+          if (containerRef.current) {
+            containerRef.current.focus();
+          }
+        }}
+        onTouchStart={(e) => {
+          // Prevent page scrolling during touch drag
+          e.preventDefault();
+        }}
+        onTouchMove={(e) => {
+          // Prevent page scrolling during touch drag
+          e.preventDefault();
+        }}
+        onTouchEnd={(e) => {
+          // Clean up focus on touch end
+          e.preventDefault();
+          if (containerRef.current) {
+            containerRef.current.blur();
+          }
         }}
         ref={containerRef}
         style={{
           background: backgroundGradient,
+          touchAction: 'none', // Prevent all touch gestures
         }}
+        tabIndex={0} // Make focusable for proper touch handling
         {...props}
       >
         <div
