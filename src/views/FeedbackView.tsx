@@ -157,8 +157,9 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
             onPointerCancelCapture={handleBlackLevelEnd}
           >
             <Knob
-              valueRaw={blackLevelInteracting ? blackLevelLiveRef.current : uiBlackLevel}
-              onValueRawChange={handleBlackLevelChange}
+              value={blackLevelInteracting ? blackLevelLiveRef.current : uiBlackLevel}
+              onChange={handleBlackLevelChange}
+              onChangeEnd={handleBlackLevelEnd}
               valueMin={0}
               valueMax={1}
               disabled={!isConnected}
@@ -177,8 +178,9 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
             onPointerCancelCapture={handleSaturationEnd}
           >
             <Knob
-              valueRaw={saturationInteracting ? saturationLiveRef.current : uiSaturation}
-              onValueRawChange={handleSaturationChange}
+              value={saturationInteracting ? saturationLiveRef.current : uiSaturation}
+              onChange={handleSaturationChange}
+              onChangeEnd={handleSaturationEnd}
               valueMin={0}
               valueMax={2}
               disabled={!isConnected}

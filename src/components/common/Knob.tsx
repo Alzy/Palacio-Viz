@@ -4,7 +4,17 @@ import React from 'react';
 import { KnobHeadless } from './ReactKnobHeadless';
 
 type KnobHeadlessProps = React.ComponentProps<typeof KnobHeadless>;
-type KnobProps = Pick<KnobHeadlessProps, 'valueRaw' | 'onValueRawChange' | 'valueMin' | 'valueMax'> & {
+type KnobProps = {
+  /** Current value */
+  value?: number;
+  /** Callback fired during drag (high-freq) */
+  onChange?: (value: number) => void;
+  /** Callback fired when drag ends */
+  onChangeEnd?: (value: number) => void;
+  /** Minimum value (default: 0) */
+  valueMin?: number;
+  /** Maximum value (default: 1) */
+  valueMax?: number;
   /** Size of the knob in pixels (default: 60) */
   size?: number;
   /** Whether the knob is disabled */
@@ -21,7 +31,9 @@ type KnobProps = Pick<KnobHeadlessProps, 'valueRaw' | 'onValueRawChange' | 'valu
 
 export function Knob(props: KnobProps) {
   const {
-    valueRaw,
+    value = 0,
+    onChange,
+    onChangeEnd,
     valueMin = 0,
     valueMax = 1,
     size = 60,
@@ -30,20 +42,16 @@ export function Knob(props: KnobProps) {
     label,
     showValue = true,
     valueDecimals = 2,
-    onValueRawChange,
-    ...knobProps
   } = props;
 
   // Simple rounding and display functions
-  const valueRawRoundFn = (valueRaw: number): number => {
-    return Math.round(valueRaw * 100) / 100;
-  };
+  const valueRawRoundFn = (valueRaw: number): number => valueRaw; // No rounding during drag
   const valueRawDisplayFn = (valueRaw: number): string => {
     return valueRaw.toFixed(valueDecimals);
   };
 
   // Normalize value to 0-1 range for visual display
-  const normalizedValue = (valueRaw - valueMin) / (valueMax - valueMin);
+  const normalizedValue = (value - valueMin) / (valueMax - valueMin);
   const angle = -135 + (normalizedValue * 270);
 
   const center = size / 2;
@@ -57,12 +65,13 @@ export function Knob(props: KnobProps) {
   return (
     <div className={`inline-flex flex-col items-center space-y-2 ${className}`}>
       <KnobHeadless
-        valueRaw={valueRaw}
+        valueRaw={value}
         valueMin={valueMin}
         valueMax={valueMax}
         valueRawRoundFn={valueRawRoundFn}
         valueRawDisplayFn={valueRawDisplayFn}
-        onValueRawChange={onValueRawChange}
+        onValueRawChange={onChange || (() => {})}
+        onValueRawChangeEnd={onChangeEnd}
         dragSensitivity={0.006}
         aria-label={label || 'Knob control'}
         includeIntoTabOrder={false}
@@ -73,7 +82,6 @@ export function Knob(props: KnobProps) {
           opacity: disabled ? 0.5 : 1,
         }}
         className="select-none"
-        {...knobProps}
       >
         <svg
           width={size}
@@ -139,7 +147,7 @@ export function Knob(props: KnobProps) {
           )}
           {showValue && (
             <div className="text-xs text-muted-foreground">
-              {valueRaw.toFixed(valueDecimals)}
+              {value.toFixed(valueDecimals)}
             </div>
           )}
         </div>

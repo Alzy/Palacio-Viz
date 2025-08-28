@@ -66,6 +66,10 @@ type KnobHeadlessProps = NativeDivPropsToExtend &
      */
     readonly onValueRawChange: (newValueRaw: number) => void;
     /**
+     * Callback for when the drag ends (optional).
+     */
+    readonly onValueRawChangeEnd?: (finalValueRaw: number) => void;
+    /**
      * @DEPRECATED Use "axis" instead.
      *
      * Orientation of the knob and its gesture.
@@ -104,6 +108,7 @@ export const KnobHeadless = forwardRef<HTMLDivElement, KnobHeadlessProps>(
       valueRawRoundFn,
       valueRawDisplayFn,
       onValueRawChange,
+      onValueRawChangeEnd,
       orientation,
       axis = axisDefault,
       includeIntoTabOrder = includeIntoTabOrderDefault,
@@ -117,7 +122,7 @@ export const KnobHeadless = forwardRef<HTMLDivElement, KnobHeadlessProps>(
 
     /* v8 ignore start */ // eslint-disable-line capitalized-comments
     const bindDrag = useDrag(
-      ({delta}) => {
+      ({delta, last}) => {
         let diff01 = 0.0;
         diff01 += delta[0] * dragSensitivity;
         diff01 += delta[1] * -dragSensitivity; // Negating the sensitivity for vertical axis (Y), since the direction of it goes top down on computer screens.
@@ -134,6 +139,11 @@ export const KnobHeadless = forwardRef<HTMLDivElement, KnobHeadlessProps>(
         );
 
         onValueRawChange(newValueRaw);
+        
+        // Call onChangeEnd when drag ends
+        if (last && onValueRawChangeEnd) {
+          onValueRawChangeEnd(newValueRaw);
+        }
       },
       {
         pointer: {
@@ -178,13 +188,6 @@ export const KnobHeadless = forwardRef<HTMLDivElement, KnobHeadlessProps>(
 );
 
 KnobHeadless.displayName = 'KnobHeadless';
-
-KnobHeadless.defaultProps = {
-  axis: axisDefault,
-  includeIntoTabOrder: includeIntoTabOrderDefault,
-  mapTo01: mapTo01Default,
-  mapFrom01: mapFrom01Default,
-};
 
 const getDragAxis = (
   orientation: 'horizontal' | 'vertical' | undefined,
