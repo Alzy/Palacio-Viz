@@ -35,10 +35,11 @@ const ColorMixer: React.FC<ColorMixerProps> = ({
   // Update keys when colors change from recalls
   useEffect(() => {
     if (lastChangeSource === 'recall') {
+      // Increment both keys to force both ColorPickers to re-render
       leftKeyRef.current += 1;
       rightKeyRef.current += 1;
     }
-  }, [leftColor, rightColor, lastChangeSource]);
+  }, [lastChangeSource]); // Only depend on lastChangeSource to ensure both update together
 
   const handleLeftColorChange = useCallback((rgba: any) => {
     // Convert RGBA array to hex color
