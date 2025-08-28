@@ -25,7 +25,7 @@ const XYControl: React.FC<XYControlProps> = ({
   onChangeEnd,
   className = '',
   disabled = false,
-  gridLines = 4,
+  gridLines = 5,
   xTitle,
   yTitle,
 }) => {
