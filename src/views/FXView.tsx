@@ -14,17 +14,6 @@ import { usePreFXStore, usePostFXStore } from '@/store/fxStore';
 type RGBA = { r: number; g: number; b: number; a: number };
 
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-const toHex2 = (n: number) => n.toString(16).padStart(2, '0');
-const rgbaToHex = ({ r, g, b }: RGBA) => `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
-const hexToRgba = (hex?: string, alpha: number = 1): RGBA => {
-  if (!hex || !/^#([0-9a-f]{6})$/i.test(hex)) return { r: 255, g: 0, b: 0, a: alpha };
-  return {
-    r: parseInt(hex.slice(1, 3), 16),
-    g: parseInt(hex.slice(3, 5), 16),
-    b: parseInt(hex.slice(5, 7), 16),
-    a: alpha,
-  };
-};
 const colorEq = (a: RGBA, b: RGBA) =>
   a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a;
 
@@ -97,10 +86,12 @@ const FXView: React.FC<FXViewProps> = ({
   // Picker change:
   //  - while dragging: update only ref (no setState → no re-render → pointer stays)
   //  - not dragging: controlled path with guard to avoid echo loops
-  const handleTintChange = useCallback((rgba: number[]) => {
+  const handleTintChange = (rgba: number[]) => {
     const [r, g, b, a] = rgba;
     const next: RGBA = { r: Math.round(r), g: Math.round(g), b: Math.round(b), a: clamp01(a) };
-    if (onSend) onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
+    if (onSend) {
+      if (!colorEq(next, tintColor)) onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
+    }
 
     if (interactingRef.current) {
       liveRef.current = next;
@@ -109,7 +100,7 @@ const FXView: React.FC<FXViewProps> = ({
     if (ignoreNextOnChangeRef.current) return;
     setUiColor(prev => (colorEq(prev, next) ? prev : next));
     liveRef.current = next;
-  }, [onSend, fxType]);
+  };
 
   // Other controls (keep your immediate send behavior + styling)
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
