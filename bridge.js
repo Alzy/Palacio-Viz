@@ -11,6 +11,10 @@ const TOUCHDESIGNER_PORT = parseInt(process.env.TOUCHDESIGNER_PORT) || 7000;
 
 console.log('🌉 Starting OSC WebSocket-to-UDP Bridge...');
 console.log(`📦 Using osc library version: ${require('./node_modules/osc/package.json').version}`);
+console.log(`⚙️  Configuration:`);
+console.log(`   WebSocket Port: ${WEBSOCKET_PORT}`);
+console.log(`   TouchDesigner Host: ${TOUCHDESIGNER_HOST}`);
+console.log(`   TouchDesigner Port: ${TOUCHDESIGNER_PORT}`);
 
 // Create UDP socket using Node.js dgram for better reliability
 const udpSocket = dgram.createSocket('udp4');
@@ -117,6 +121,20 @@ wss.on('connection', (ws, request) => {
                     udpSocket.send(oscBuffer, TOUCHDESIGNER_PORT, TOUCHDESIGNER_HOST, (error) => {
                         if (error) {
                             console.error('❌ Failed to send OSC message:', error);
+                            if (error.code === 'ENETUNREACH') {
+                                console.error(`❌ Network unreachable: Cannot reach ${TOUCHDESIGNER_HOST}:${TOUCHDESIGNER_PORT}`);
+                                console.error(`❌ Please check:`);
+                                console.error(`   • Is ${TOUCHDESIGNER_HOST} the correct IP address?`);
+                                console.error(`   • Is the target device on the same network?`);
+                                console.error(`   • Is there a firewall blocking UDP traffic?`);
+                                console.error(`   • Is TouchDesigner running and listening on port ${TOUCHDESIGNER_PORT}?`);
+                            } else if (error.code === 'EHOSTUNREACH') {
+                                console.error(`❌ Host unreachable: ${TOUCHDESIGNER_HOST} is not reachable`);
+                                console.error(`❌ Check network connectivity and IP address`);
+                            } else if (error.code === 'ECONNREFUSED') {
+                                console.error(`❌ Connection refused: ${TOUCHDESIGNER_HOST}:${TOUCHDESIGNER_PORT} is not accepting connections`);
+                                console.error(`❌ Check if TouchDesigner is running and OSC In is configured`);
+                            }
                         } else {
                             console.log(`📤 OSC: ${oscMessage.address} [${processedArgs.map(arg => `${arg.type}:${arg.value}`).join(', ')}]`);
                         }
@@ -178,39 +196,135 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
+// Network connectivity test function
+function testNetworkConnectivity() {
+    const net = require('net');
+    console.log(`🔍 Testing network connectivity to ${TOUCHDESIGNER_HOST}...`);
+    
+    // Test if we can reach the host (try a TCP connection first)
+    const socket = new net.Socket();
+    socket.setTimeout(3000);
+    
+    socket.on('connect', () => {
+        console.log(`✅ TCP connectivity to ${TOUCHDESIGNER_HOST} confirmed`);
+        socket.destroy();
+        
+        // If TCP works, test UDP specifically
+        setTimeout(() => {
+            testUDPConnectivity();
+        }, 500);
+    });
+    
+    socket.on('timeout', () => {
+        console.log(`⚠️  TCP connection to ${TOUCHDESIGNER_HOST} timed out`);
+        console.log(`⚠️  Host may be reachable but not accepting TCP connections`);
+        socket.destroy();
+    });
+    
+    socket.on('error', (error) => {
+        if (error.code === 'ENETUNREACH') {
+            console.log(`❌ Network unreachable: Cannot reach ${TOUCHDESIGNER_HOST}`);
+            console.log(`❌ Check if ${TOUCHDESIGNER_HOST} is on the same network`);
+        } else if (error.code === 'EHOSTUNREACH') {
+            console.log(`❌ Host unreachable: ${TOUCHDESIGNER_HOST} is not responding`);
+        } else if (error.code === 'ECONNREFUSED') {
+            console.log(`✅ Host ${TOUCHDESIGNER_HOST} is reachable (connection refused is normal for UDP-only services)`);
+            
+            // If TCP works, test UDP specifically
+            setTimeout(() => {
+                testUDPConnectivity();
+            }, 500);
+        } else {
+            console.log(`⚠️  Network test error:`, error.code);
+        }
+        socket.destroy();
+    });
+    
+    // Try to connect to a common port (we expect this to fail, but it tests reachability)
+    socket.connect(80, TOUCHDESIGNER_HOST);
+}
+
+// UDP-specific connectivity test
+function testUDPConnectivity() {
+    console.log(`🔍 Testing UDP connectivity to ${TOUCHDESIGNER_HOST}:${TOUCHDESIGNER_PORT}...`);
+    
+    // Create a simple test UDP socket
+    const testSocket = dgram.createSocket('udp4');
+    const testMessage = Buffer.from('UDP_TEST');
+    
+    testSocket.send(testMessage, TOUCHDESIGNER_PORT, TOUCHDESIGNER_HOST, (error) => {
+        if (error) {
+            console.log(`❌ UDP test failed:`, error.code);
+            if (error.code === 'ENETUNREACH') {
+                console.log(`❌ UDP traffic to ${TOUCHDESIGNER_HOST}:${TOUCHDESIGNER_PORT} is blocked`);
+                console.log(`🔧 Possible solutions:`);
+                console.log(`   • Check Windows Firewall settings on both machines`);
+                console.log(`   • Check router/network firewall settings`);
+                console.log(`   • Try temporarily disabling firewalls for testing`);
+                console.log(`   • Verify TouchDesigner OSC In CHOP is configured and active`);
+                console.log(`   • Try a different port (e.g., 7001, 8000)`);
+            }
+        } else {
+            console.log(`✅ UDP connectivity to ${TOUCHDESIGNER_HOST}:${TOUCHDESIGNER_PORT} appears to work`);
+            console.log(`✅ The issue might be with TouchDesigner OSC configuration`);
+        }
+        testSocket.close();
+    });
+}
+
 // Test function - send a test message when UDP is ready
 function sendTestMessage() {
-    console.log('🧪 Sending test OSC message...');
-    try {
-        const testMessage = {
-            address: '/test',
-            args: [
-                { type: 's', value: 'bridge_ready' },
-                { type: 'f', value: 1.0 }
-            ]
-        };
-        
-        if (udpSocketReady) {
-            console.log(`🔍 Debug - Test message:`, testMessage);
+    // First test network connectivity
+    testNetworkConnectivity();
+    
+    // Wait a bit then try the OSC test
+    setTimeout(() => {
+        console.log('🧪 Sending test OSC message...');
+        try {
+            const testMessage = {
+                address: '/test',
+                args: [
+                    { type: 's', value: 'bridge_ready' },
+                    { type: 'f', value: 1.0 }
+                ]
+            };
             
-            // Send via dgram socket
-            const oscBuffer = osc.writePacket(testMessage, {});
-            console.log(`🔍 Debug - Test buffer size: ${oscBuffer.length} bytes`);
-            console.log(`🔍 Debug - Test buffer hex:`, oscBuffer.toString('hex'));
-            
-            udpSocket.send(oscBuffer, TOUCHDESIGNER_PORT, TOUCHDESIGNER_HOST, (error) => {
-                if (error) {
-                    console.error('❌ Test message failed:', error);
-                } else {
-                    console.log('✅ Test message sent successfully');
-                    console.log(`📤 Test OSC: ${testMessage.address} [${testMessage.args.map(arg => `${arg.type}:${arg.value}`).join(', ')}]`);
-                }
-            });
-        } else {
-            console.warn('⚠️  UDP socket not ready for test message');
+            if (udpSocketReady) {
+                console.log(`🔍 Debug - Test message:`, testMessage);
+                
+                // Send via dgram socket
+                const oscBuffer = osc.writePacket(testMessage, {});
+                console.log(`🔍 Debug - Test buffer size: ${oscBuffer.length} bytes`);
+                console.log(`🔍 Debug - Test buffer hex:`, oscBuffer.toString('hex'));
+                
+                udpSocket.send(oscBuffer, TOUCHDESIGNER_PORT, TOUCHDESIGNER_HOST, (error) => {
+                    if (error) {
+                        console.error('❌ Test message failed:', error);
+                        console.error(`❌ Cannot reach TouchDesigner at ${TOUCHDESIGNER_HOST}:${TOUCHDESIGNER_PORT}`);
+                        console.error(`❌ This means OSC messages will not be delivered to TouchDesigner`);
+                        console.error(`❌ WebSocket clients can still connect, but OSC forwarding will fail`);
+                        
+                        if (error.code === 'ENETUNREACH') {
+                            console.error(`\n🔧 Troubleshooting steps:`);
+                            console.error(`   1. Verify ${TOUCHDESIGNER_HOST} is the correct IP address`);
+                            console.error(`   2. Check if the target device is on the same network`);
+                            console.error(`   3. Try pinging: ping ${TOUCHDESIGNER_HOST}`);
+                            console.error(`   4. Check firewall settings on both machines`);
+                            console.error(`   5. Verify TouchDesigner is running with OSC In CHOP on port ${TOUCHDESIGNER_PORT}`);
+                            console.error(`\n💡 For local testing, try setting TOUCHDESIGNER_HOST=127.0.0.1 in .env`);
+                        }
+                    } else {
+                        console.log('✅ Test message sent successfully');
+                        console.log(`📤 Test OSC: ${testMessage.address} [${testMessage.args.map(arg => `${arg.type}:${arg.value}`).join(', ')}]`);
+                        console.log('✅ TouchDesigner connectivity confirmed!');
+                    }
+                });
+            } else {
+                console.warn('⚠️  UDP socket not ready for test message');
+            }
+        } catch (error) {
+            console.error('❌ Test message failed:', error);
+            console.error('❌ Error details:', error.message);
         }
-    } catch (error) {
-        console.error('❌ Test message failed:', error);
-        console.error('❌ Error details:', error.message);
-    }
+    }, 1000);
 }
