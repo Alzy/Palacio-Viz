@@ -104,8 +104,9 @@ const FXView: React.FC<FXViewProps> = ({
   //  - while dragging: update only ref (no setState → no re-render → pointer stays)
   //  - not dragging: controlled path with guard to avoid echo loops
   const handleTintChange = useCallback((rgba: number[]) => {
-    const [r, g, b, a = 1] = rgba;
+    const [r, g, b, a] = rgba;
     const next: RGBA = { r: Math.round(r), g: Math.round(g), b: Math.round(b), a: clamp01(a) };
+    if (onSend) onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
 
     if (interactingRef.current) {
       liveRef.current = next;
