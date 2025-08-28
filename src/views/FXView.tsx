@@ -11,11 +11,28 @@ import {
 } from '@/components/ui/shadcn-io/color-picker';
 import { usePreFXStore, usePostFXStore } from '@/store/fxStore';
 
+type RGBA = { r: number; g: number; b: number; a: number };
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+const toHex2 = (n: number) => n.toString(16).padStart(2, '0');
+const rgbaToHex = ({ r, g, b }: RGBA) => `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
+const hexToRgba = (hex?: string): RGBA => {
+  if (!hex || !/^#([0-9a-f]{6})$/i.test(hex)) return { r: 255, g: 0, b: 0, a: 1 };
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+    a: 1,
+  };
+};
+const colorEq = (a: RGBA, b: RGBA) =>
+  a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a;
+
 interface FXViewProps {
   /** Whether the OSC connection is active */
   isConnected: boolean;
   /** Callback to send OSC messages */
-  onSend: (address: string, ...args: any[]) => void;
+  onSend?: (address: string, ...args: any[]) => void;
   /** FX type - determines OSC endpoint */
   fxType: 'pre' | 'post';
 }
@@ -26,8 +43,8 @@ const FXView: React.FC<FXViewProps> = ({
   fxType,
 }) => {
   const useStore = fxType === 'pre' ? usePreFXStore : usePostFXStore;
-  
-  // Use atomic selectors to minimize re-renders (following strategy doc)
+
+  // Atomic selectors (same as your file)
   const brightnessContrast = useStore((state) => state.brightnessContrast);
   const zoom = useStore((state) => state.zoom);
   const pan = useStore((state) => state.pan);
@@ -35,8 +52,8 @@ const FXView: React.FC<FXViewProps> = ({
   const saturation = useStore((state) => state.saturation);
   const tintColor = useStore((state) => state.tintColor);
   const lastChangeSource = useStore((state) => state.lastChangeSource);
-  
-  // Get store actions
+
+  // Actions
   const setBrightnessContrast = useStore((state) => state.setBrightnessContrast);
   const setZoom = useStore((state) => state.setZoom);
   const setPan = useStore((state) => state.setPan);
@@ -44,54 +61,85 @@ const FXView: React.FC<FXViewProps> = ({
   const setSaturation = useStore((state) => state.setSaturation);
   const setTintColor = useStore((state) => state.setTintColor);
 
-  // Use the exact same pattern as ColorMixer - immediate updates, no throttling/debouncing
+  // ----- Tint color: dual-mode control -----
+  const storeRGBA = useMemo(() => hexToRgba(tintColor), [tintColor]);
+  const [uiColor, setUiColor] = useState<RGBA>(storeRGBA);
+  const liveRef = useRef<RGBA>(storeRGBA);      // latest live color during drag (no re-render)
+  const interactingRef = useRef(false);         // true while dragging
+  const ignoreNextOnChangeRef = useRef(false);  // guard when controlled to avoid echo loops
+
+  // If your store uses a 'recall' flag to remount the picker, keep your key
   const tintKeyRef = useRef(0);
-  
-  // Update key when colors change from recalls - ONLY depend on lastChangeSource
   useEffect(() => {
-    if (lastChangeSource === 'recall') {
-      tintKeyRef.current += 1;
-    }
+    if (lastChangeSource === 'recall') tintKeyRef.current += 1;
   }, [lastChangeSource]);
 
-  // Simple onChange handler - immediate store update and OSC like ColorMixer
-  const handleTintChange = useCallback((rgba: number[]) => {
-    const r = Math.round(rgba[0]);
-    const g = Math.round(rgba[1]);
-    const b = Math.round(rgba[2]);
-    const a = rgba[3] ?? 1.0;
-    const hexColor = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
-    
-    // Update store immediately like ColorMixer does
-    setTintColor(hexColor, 'user');
-    
-    // Send OSC immediately
-    onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
-  }, [fxType, onSend, setTintColor]);
+  // Store -> Local sync ONLY when not dragging (prevents loops)
+  useEffect(() => {
+    if (interactingRef.current) return;
+    const next = storeRGBA;
+    if (!colorEq(next, uiColor)) {
+      ignoreNextOnChangeRef.current = true; // silence one echo from controlled picker
+      setUiColor(next);
+      liveRef.current = next;
+      setTimeout(() => { ignoreNextOnChangeRef.current = false; }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeRGBA]);
 
+  // Single commit to store (and one optional OSC send) on release
+  const commitTint = useCallback((c: RGBA) => {
+    const hex = rgbaToHex(c);
+    // match your action signature if it accepts a source:
+    try {
+      // @ts-ignore - support (hex, 'user') signature if present
+      setTintColor(hex, 'user');
+    } catch {
+      setTintColor(hex as any);
+    }
+    if (isConnected && onSend) onSend(`/${fxType}/tint`, c.r / 255, c.g / 255, c.b / 255, clamp01(c.a));
+  }, [fxType, isConnected, onSend, setTintColor]);
+
+  // Picker change:
+  //  - while dragging: update only ref (no setState → no re-render → pointer stays)
+  //  - not dragging: controlled path with guard to avoid echo loops
+  const handleTintChange = useCallback((rgba: number[]) => {
+    const [r, g, b, a = 1] = rgba;
+    const next: RGBA = { r: Math.round(r), g: Math.round(g), b: Math.round(b), a: clamp01(a) };
+
+    if (interactingRef.current) {
+      liveRef.current = next;
+      return;
+    }
+    if (ignoreNextOnChangeRef.current) return;
+    setUiColor(prev => (colorEq(prev, next) ? prev : next));
+    liveRef.current = next;
+  }, []);
+
+  // Other controls (keep your immediate send behavior + styling)
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
     setBrightnessContrast(value.x, value.y);
-    onSend(`/${fxType}/brightness_contrast`, value.x, value.y);
+    onSend?.(`/${fxType}/brightness_contrast`, value.x, value.y);
   }, [fxType, onSend, setBrightnessContrast]);
 
   const handleZoomChange = useCallback((value: { x: number; y: number }) => {
     setZoom(value.x, value.y);
-    onSend(`/${fxType}/zoom`, value.x, value.y);
+    onSend?.(`/${fxType}/zoom`, value.x, value.y);
   }, [fxType, onSend, setZoom]);
 
   const handlePanChange = useCallback((value: { x: number; y: number }) => {
     setPan(value.x, value.y);
-    onSend(`/${fxType}/pan`, value.x, value.y);
+    onSend?.(`/${fxType}/pan`, value.x, value.y);
   }, [fxType, onSend, setPan]);
 
   const handleBlackLevelChange = useCallback((value: number) => {
     setBlackLevel(value);
-    onSend(`/${fxType}/black_level`, value);
+    onSend?.(`/${fxType}/black_level`, value);
   }, [fxType, onSend, setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
     setSaturation(value);
-    onSend(`/${fxType}/saturation`, value);
+    onSend?.(`/${fxType}/saturation`, value);
   }, [fxType, onSend, setSaturation]);
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode; className?: string; }> = ({ title, description, children, className }) => (
@@ -101,6 +149,13 @@ const FXView: React.FC<FXViewProps> = ({
       {children}
     </div>
   );
+
+  // Dual-mode control for the picker:
+  //  - Not dragging: controlled with value={rgbaToHex(uiColor)}
+  //  - Dragging:     uncontrolled (omit 'value'), keeps pointer capture
+  const pickerControlledProps = !interactingRef.current
+    ? { value: rgbaToHex(uiColor) }
+    : {};
 
   return (
     <div className="flex flex-col h-full gap-6">
@@ -125,20 +180,34 @@ const FXView: React.FC<FXViewProps> = ({
         <div className="flex-1 h-full">
           <ControlCard
             title="Tint Control"
-            description={`Color tinting effect. Sends RGBA floats to /${fxType}/tint`}
-            className={`h-full`}
+            description={`Color tinting effect. Commit on release → /${fxType}/tint`}
+            className="h-full"
           >
-            <div className="w-full h-full min-h-[200px] p-4">
+            <div
+              className="w-full h-full min-h-[200px] p-4"
+              onPointerDownCapture={() => { interactingRef.current = true; }}
+              onPointerUpCapture={() => {
+                interactingRef.current = false;
+                setUiColor(liveRef.current);     // sync UI once
+                commitTint(liveRef.current);      // single store/OSC commit
+              }}
+              onPointerCancelCapture={() => {
+                interactingRef.current = false;
+                setUiColor(liveRef.current);
+                commitTint(liveRef.current);
+              }}
+            >
               <ColorPicker
                 key={`tint-${fxType}-${tintKeyRef.current}`}
-                defaultValue={tintColor}
-                onChange={handleTintChange as any}
+                {...pickerControlledProps}
+                // NOTE: during drag we omit 'value', so this becomes uncontrolled and smooth
+                onChange={handleTintChange as any}  // [r,g,b,a]
                 className="w-full h-full"
               >
-                <ColorPickerSelection className={'flex-1'}  />
+                <ColorPickerSelection className="flex-1" />
                 <div className="space-y-2">
                   <ColorPickerHue />
-                  <div className={`bg-gray-400`}>
+                  <div className="bg-gray-400">
                     <ColorPickerAlpha />
                   </div>
                 </div>
@@ -147,47 +216,47 @@ const FXView: React.FC<FXViewProps> = ({
           </ControlCard>
         </div>
       </div>
-      
+
       {/* Bottom Row */}
       <div className="flex flex-1 gap-6">
         <div className="flex-1">
           <ControlCard
-              title="Black Level"
-              description={`Controls the black point. Sends to /${fxType}/black_level`}
+            title="Black Level"
+            description={`Controls the black point. Sends to /${fxType}/black_level`}
           >
             <div className="w-full h-full flex items-center justify-center">
               <Knob
-                  value={blackLevel}
-                  onChange={handleBlackLevelChange}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  disabled={!isConnected}
-                  size={120}
+                value={blackLevel}
+                onChange={handleBlackLevelChange}
+                min={0}
+                max={1}
+                step={0.01}
+                disabled={!isConnected}
+                size={120}
               />
             </div>
           </ControlCard>
         </div>
         <div className="flex-1">
           <ControlCard
-              title="Saturation"
-              description={`Controls the color intensity. Sends to /${fxType}/saturation`}
+            title="Saturation"
+            description={`Controls the color intensity. Sends to /${fxType}/saturation`}
           >
             <div className="w-full h-full flex items-center justify-center">
               <Knob
-                  value={saturation}
-                  onChange={handleSaturationChange}
-                  min={0}
-                  max={2}
-                  step={0.01}
-                  disabled={!isConnected}
-                  size={120}
+                value={saturation}
+                onChange={handleSaturationChange}
+                min={0}
+                max={2}
+                step={0.01}
+                disabled={!isConnected}
+                size={120}
               />
             </div>
           </ControlCard>
         </div>
       </div>
-      
+
       {/* Third Row - Zoom and Pan */}
       <div className="flex flex-1 gap-6">
         <div className="flex-1">
