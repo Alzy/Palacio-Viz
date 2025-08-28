@@ -44,80 +44,17 @@ const FXView: React.FC<FXViewProps> = ({
   const setSaturation = useStore((state) => state.setSaturation);
   const setTintColor = useStore((state) => state.setTintColor);
 
-  // Following the transient updates pattern from the strategy document:
-  // Use refs to track state without causing re-renders during interaction
-  const colorPickerRef = useRef<HTMLDivElement>(null);
-  const [colorPickerKey, setColorPickerKey] = useState(0);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const throttleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const isUserInteractingRef = useRef(false);
-  const pendingColorRef = useRef<string | null>(null);
+  // Use the exact same pattern as the working ColorMixer component
+  const tintKeyRef = useRef(0);
   
-  // Subscribe to store changes for external updates (strategy doc pattern)
+  // Update key when colors change from recalls - ONLY depend on lastChangeSource
   useEffect(() => {
-    const unsubscribe = useStore.subscribe((state) => {
-      // Only update if it was an external change and user is not currently interacting
-      if (state.lastChangeSource === 'recall' && !isUserInteractingRef.current) {
-        // Force ColorPicker remount for external changes (like presets)
-        setColorPickerKey(prev => prev + 1);
-      }
-    });
-    
-    return unsubscribe;
-  }, [useStore]);
-
-  // Silent store update function that doesn't trigger re-renders
-  const silentStoreUpdate = useCallback((hexColor: string) => {
-    // Use the store's direct setter to avoid triggering our subscription
-    const currentState = useStore.getState();
-    if (currentState.tintColor !== hexColor) {
-      // Update store silently without changing lastChangeSource to avoid re-renders
-      useStore.setState({ tintColor: hexColor });
+    if (lastChangeSource === 'recall') {
+      tintKeyRef.current += 1;
     }
-  }, [useStore]);
+  }, [lastChangeSource]); // Only depend on lastChangeSource like ColorMixer
 
-  // Debounced store update function (strategy doc: "Consider Debouncing for Commit or Heavy Work")
-  const debouncedStoreUpdate = useCallback((hexColor: string) => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    
-    pendingColorRef.current = hexColor;
-    
-    debounceTimeoutRef.current = setTimeout(() => {
-      if (pendingColorRef.current) {
-        // Use silent update to prevent ColorPicker remount after drag ends
-        silentStoreUpdate(pendingColorRef.current);
-        pendingColorRef.current = null;
-      }
-      isUserInteractingRef.current = false; // Mark interaction as complete
-    }, 300); // 300ms debounce for store updates
-  }, [silentStoreUpdate]);
-
-  // Throttled OSC send function for high-frequency updates (strategy doc pattern)
-  const throttledOSCSend = useCallback((r: number, g: number, b: number, a: number) => {
-    if (throttleTimeoutRef.current) {
-      clearTimeout(throttleTimeoutRef.current);
-    }
-    
-    throttleTimeoutRef.current = setTimeout(() => {
-      onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
-    }, 16); // ~60fps throttling for OSC messages
-  }, [fxType, onSend]);
-
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      if (throttleTimeoutRef.current) {
-        clearTimeout(throttleTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Throttled onChange handler to reduce frequency of updates during ColorPickerSelection dragging
+  // Simple onChange handler - immediate store update and OSC like ColorMixer
   const handleTintChange = useCallback((rgba: number[]) => {
     const r = Math.round(rgba[0]);
     const g = Math.round(rgba[1]);
@@ -125,15 +62,12 @@ const FXView: React.FC<FXViewProps> = ({
     const a = rgba[3] ?? 1.0;
     const hexColor = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
     
-    // Mark that user is actively interacting
-    isUserInteractingRef.current = true;
+    // Update store immediately like ColorMixer does
+    setTintColor(hexColor, 'user');
     
-    // Throttle OSC messages to reduce frequency during dragging
-    throttledOSCSend(r, g, b, a);
-    
-    // Debounce store updates to reduce reactivity issues
-    debouncedStoreUpdate(hexColor);
-  }, [throttledOSCSend, debouncedStoreUpdate]);
+    // Send OSC immediately
+    onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
+  }, [fxType, onSend, setTintColor]);
 
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
     setBrightnessContrast(value.x, value.y);
@@ -194,9 +128,9 @@ const FXView: React.FC<FXViewProps> = ({
             description={`Color tinting effect. Sends RGBA floats to /${fxType}/tint`}
             className={`h-full`}
           >
-            <div className="w-full h-full min-h-[200px] p-4" ref={colorPickerRef}>
+            <div className="w-full h-full min-h-[200px] p-4">
               <ColorPicker
-                key={`tint-${fxType}-${colorPickerKey}`}
+                key={`tint-${fxType}-${tintKeyRef.current}`}
                 defaultValue={tintColor}
                 onChange={handleTintChange as any}
                 className="w-full h-full"

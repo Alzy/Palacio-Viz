@@ -86,12 +86,13 @@ export const ColorPicker = ({
   // Update color when controlled value changes
   useEffect(() => {
     if (value) {
-      const color = Color.rgb(value).rgb().object();
+      const color = Color(value);
+      const [h, s, l] = color.hsl().array();
 
-      setHue(color.r);
-      setSaturation(color.g);
-      setLightness(color.b);
-      setAlpha(color.a);
+      setHue(h || 0);
+      setSaturation(s || 0);
+      setLightness(l || 0);
+      setAlpha((color.alpha() || 1) * 100);
     }
   }, [value]);
 
@@ -136,7 +137,22 @@ export const ColorPickerSelection = memo(
     const [isDragging, setIsDragging] = useState(false);
     const [positionX, setPositionX] = useState(0);
     const [positionY, setPositionY] = useState(0);
-    const { hue, setSaturation, setLightness } = useColorPicker();
+    const { hue, saturation, lightness, setSaturation, setLightness } = useColorPicker();
+
+    // Initialize and sync cursor position with current saturation/lightness values
+    useEffect(() => {
+      // Convert saturation (0-100) to x position (0-1)
+      const x = saturation / 100;
+      
+      // Convert lightness to y position - this is the inverse of the calculation in handlePointerMove
+      // From handlePointerMove: lightness = topLightness * (1 - y)
+      // So: y = 1 - (lightness / topLightness)
+      const topLightness = x < 0.01 ? 100 : 50 + 50 * (1 - x);
+      const y = topLightness > 0 ? 1 - (lightness / topLightness) : 0;
+      
+      setPositionX(Math.max(0, Math.min(1, x)));
+      setPositionY(Math.max(0, Math.min(1, y)));
+    }, [saturation, lightness]);
 
     const backgroundGradient = useMemo(() => {
       return `linear-gradient(0deg, rgba(0,0,0,1), rgba(0,0,0,0)),
