@@ -9,6 +9,10 @@ export default function Home() {
   const { isConnected, connectionStatus, bridgeInfo, error, connect, disconnect, send } = useOSC();
   const [activeTab, setActiveTab] = useState('prompt');
 
+  // Get bridge connection details for error context
+  const bridgeHost = process.env.NEXT_PUBLIC_OSC_BRIDGE_HOST || 'localhost';
+  const bridgePort = parseInt(process.env.NEXT_PUBLIC_OSC_BRIDGE_PORT || '8080');
+
   const tabs = [
     { id: 'prompt', label: 'Prompt', component: <PromptView isConnected={isConnected} onSend={send} /> },
     { id: 'prefx', label: 'PreFX', component: <FXView isConnected={isConnected} onSend={send} fxType="pre" /> },
@@ -25,6 +29,8 @@ export default function Home() {
         isConnected={isConnected}
         bridgeInfo={bridgeInfo || undefined}
         error={error || undefined}
+        bridgeHost={bridgeHost}
+        bridgePort={bridgePort}
         onConnect={connect}
         onDisconnect={disconnect}
       />

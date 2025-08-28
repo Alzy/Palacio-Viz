@@ -15,6 +15,10 @@ interface ConnectionStatusProps {
   };
   /** Error message if any */
   error?: string;
+  /** Bridge host and port for error context */
+  bridgeHost?: string;
+  /** Bridge port for error context */
+  bridgePort?: number;
   /** Connect function */
   onConnect: () => void;
   /** Disconnect function */
@@ -26,6 +30,8 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
   isConnected,
   bridgeInfo,
   error,
+  bridgeHost,
+  bridgePort,
   onConnect,
   onDisconnect,
 }) => {
@@ -69,6 +75,11 @@ const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           {error && (
             <span className="text-destructive text-sm">
               Error: {error}
+              {bridgeHost && bridgePort && (
+                <span className="text-muted-foreground ml-1">
+                  (trying to connect to {bridgeHost}:{bridgePort})
+                </span>
+              )}
             </span>
           )}
         </div>
