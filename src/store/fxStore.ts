@@ -42,7 +42,7 @@ type FXActions = {
 // Create separate stores for pre and post FX
 const createFXStore = () => create<FXState>((set) => ({
   brightnessContrast: { x: 0.5, y: 0.5 },
-  zoom: { x: 1.0, y: 1.0 },
+  zoom: { x: 0.5, y: 0.5 },
   pan: { x: 0.5, y: 0.5 },
   blackLevel: 0,
   saturation: 1,
