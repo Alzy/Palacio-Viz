@@ -114,7 +114,6 @@ const FXView: React.FC<FXViewProps> = ({
   // Other controls (keep your immediate send behavior + styling)
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
     setBrightnessContrast(value.x, value.y);
-    console.log('hm')
     onSend?.(`/${fxType}/brightness_contrast`, value.x, value.y);
   }, [fxType, onSend, setBrightnessContrast]);
 
