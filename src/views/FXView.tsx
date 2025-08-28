@@ -42,7 +42,8 @@ const FXView: React.FC<FXViewProps> = ({
   onSend,
   fxType,
 }) => {
-  const useStore = fxType === 'pre' ? usePreFXStore : usePostFXStore;
+  // Stabilize store reference to prevent callback recreation
+  const useStore = useMemo(() => fxType === 'pre' ? usePreFXStore : usePostFXStore, [fxType]);
 
   // Atomic selectors (same as your file)
   const brightnessContrast = useStore((state) => state.brightnessContrast);
@@ -53,13 +54,13 @@ const FXView: React.FC<FXViewProps> = ({
   const tintColor = useStore((state) => state.tintColor);
   const lastChangeSource = useStore((state) => state.lastChangeSource);
 
-  // Actions
-  const setBrightnessContrast = useStore((state) => state.setBrightnessContrast);
-  const setZoom = useStore((state) => state.setZoom);
-  const setPan = useStore((state) => state.setPan);
-  const setBlackLevel = useStore((state) => state.setBlackLevel);
-  const setSaturation = useStore((state) => state.setSaturation);
-  const setTintColor = useStore((state) => state.setTintColor);
+  // Actions - use stable selectors to prevent recreation
+  const setBrightnessContrast = useStore(useCallback((state) => state.setBrightnessContrast, []));
+  const setZoom = useStore(useCallback((state) => state.setZoom, []));
+  const setPan = useStore(useCallback((state) => state.setPan, []));
+  const setBlackLevel = useStore(useCallback((state) => state.setBlackLevel, []));
+  const setSaturation = useStore(useCallback((state) => state.setSaturation, []));
+  const setTintColor = useStore(useCallback((state) => state.setTintColor, []));
 
   // ----- Tint color: dual-mode control -----
   const storeRGBA = useMemo(() => tintColor, [tintColor]);
@@ -108,11 +109,12 @@ const FXView: React.FC<FXViewProps> = ({
     if (ignoreNextOnChangeRef.current) return;
     setUiColor(prev => (colorEq(prev, next) ? prev : next));
     liveRef.current = next;
-  }, []);
+  }, [onSend, fxType]);
 
   // Other controls (keep your immediate send behavior + styling)
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
     setBrightnessContrast(value.x, value.y);
+    console.log('hm')
     onSend?.(`/${fxType}/brightness_contrast`, value.x, value.y);
   }, [fxType, onSend, setBrightnessContrast]);
 
