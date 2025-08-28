@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import XYControl from '@/components/common/XYControl';
 import Knob from '@/components/common/Knob';
 import { useFeedbackStore } from '@/store/feedbackStore';
@@ -16,29 +16,77 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
   isConnected,
   onSend,
 }) => {
-  const {
-    brightnessContrast,
-    blackLevel,
-    saturation,
-    setBrightnessContrast,
-    setBlackLevel,
-    setSaturation
-  } = useFeedbackStore();
+  // Atomic selectors
+  const brightnessContrast = useFeedbackStore((state) => state.brightnessContrast);
+  const blackLevel = useFeedbackStore((state) => state.blackLevel);
+  const saturation = useFeedbackStore((state) => state.saturation);
+  const lastChangeSource = useFeedbackStore((state) => state.lastChangeSource);
 
+  // Actions - use stable selectors to prevent recreation
+  const setBrightnessContrast = useFeedbackStore(useCallback((state) => state.setBrightnessContrast, []));
+  const setBlackLevel = useFeedbackStore(useCallback((state) => state.setBlackLevel, []));
+  const setSaturation = useFeedbackStore(useCallback((state) => state.setSaturation, []));
+
+  // ----- XY Control: dual-mode control -----
+  const [uiBrightnessContrast, setUiBrightnessContrast] = useState(brightnessContrast);
+  const brightnessContrastLiveRef = useRef(brightnessContrast);
+  const brightnessContrastInteractingRef = useRef(false);
+
+  // ----- Knob Controls: simpler responsive pattern -----
+  const [uiBlackLevel, setUiBlackLevel] = useState(blackLevel);
+  const [uiSaturation, setUiSaturation] = useState(saturation);
+
+  // Sync controls from store when not interacting
+  useEffect(() => {
+    if (!brightnessContrastInteractingRef.current) {
+      setUiBrightnessContrast(brightnessContrast);
+      brightnessContrastLiveRef.current = brightnessContrast;
+    }
+  }, [brightnessContrast]);
+
+  useEffect(() => {
+    setUiBlackLevel(blackLevel);
+  }, [blackLevel]);
+
+  useEffect(() => {
+    setUiSaturation(saturation);
+  }, [saturation]);
+
+  // XY Control: dual-mode pattern
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
-    setBrightnessContrast(value.x, value.y);
     onSend('/feedback/brightness_contrast', value.x, value.y);
-  }, [onSend, setBrightnessContrast]);
+    if (brightnessContrastInteractingRef.current) {
+      brightnessContrastLiveRef.current = value;
+      return;
+    }
+    setUiBrightnessContrast(value);
+    brightnessContrastLiveRef.current = value;
+  }, [onSend]);
 
+  const handleBrightnessContrastEnd = useCallback((value: { x: number; y: number }) => {
+    brightnessContrastInteractingRef.current = false;
+    setUiBrightnessContrast(value);
+    setBrightnessContrast(value.x, value.y);
+  }, [setBrightnessContrast]);
+
+  // Knob Controls: immediate update pattern (knobs don't support uncontrolled mode)
   const handleBlackLevelChange = useCallback((value: number) => {
+    setUiBlackLevel(value);
     setBlackLevel(value);
     onSend('/feedback/black_level', value);
   }, [onSend, setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
+    setUiSaturation(value);
     setSaturation(value);
     onSend('/feedback/saturation', value);
   }, [onSend, setSaturation]);
+
+  // Dual-mode control props
+  const brightnessContrastControlledProps = !brightnessContrastInteractingRef.current
+    ? { value: uiBrightnessContrast }
+    : {};
+
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode }> = ({ title, description, children }) => (
     <div className="bg-card rounded-lg shadow-md p-4 flex flex-col">
@@ -56,10 +104,14 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
           title="Brightness & Contrast"
           description="X: Brightness, Y: Contrast. Sends to /feedback/brightness_contrast"
         >
-          <div className="w-full h-full min-h-[400px] aspect-square mx-auto">
+          <div
+            className="w-full h-full min-h-[400px] aspect-square mx-auto"
+            onPointerDownCapture={() => { brightnessContrastInteractingRef.current = true; }}
+          >
             <XYControl
-              value={brightnessContrast}
+              {...brightnessContrastControlledProps}
               onChange={handleBrightnessContrastChange}
+              onChangeEnd={handleBrightnessContrastEnd}
               disabled={!isConnected}
               xTitle="Brightness"
               yTitle="Contrast"
@@ -76,7 +128,7 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
         >
           <div className="w-full h-full flex items-center justify-center">
             <Knob
-              value={blackLevel}
+              value={uiBlackLevel}
               onChange={handleBlackLevelChange}
               min={0}
               max={1}
@@ -92,7 +144,7 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({
         >
           <div className="w-full h-full flex items-center justify-center">
             <Knob
-              value={saturation}
+              value={uiSaturation}
               onChange={handleSaturationChange}
               min={0}
               max={2}
