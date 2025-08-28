@@ -12,8 +12,8 @@ interface FXState {
   blackLevel: number;
   saturation: number;
   
-  // Color picker value
-  tintColor: string;
+  // Color picker value (RGBA format to preserve alpha)
+  tintColor: { r: number; g: number; b: number; a: number };
   
   lastChangeSource: 'user' | 'recall' | 'init';
   
@@ -23,7 +23,7 @@ interface FXState {
   setPan: (x: number, y: number) => void;
   setBlackLevel: (value: number) => void;
   setSaturation: (value: number) => void;
-  setTintColor: (color: string, source?: 'user' | 'recall') => void;
+  setTintColor: (color: { r: number; g: number; b: number; a: number }, source?: 'user' | 'recall') => void;
   setAllValues: (values: Partial<Omit<FXState, 'lastChangeSource' | keyof FXActions>>) => void;
   recallValues: (values: Partial<Omit<FXState, 'lastChangeSource' | keyof FXActions>>) => void;
 }
@@ -34,7 +34,7 @@ type FXActions = {
   setPan: (x: number, y: number) => void;
   setBlackLevel: (value: number) => void;
   setSaturation: (value: number) => void;
-  setTintColor: (color: string, source?: 'user' | 'recall') => void;
+  setTintColor: (color: { r: number; g: number; b: number; a: number }, source?: 'user' | 'recall') => void;
   setAllValues: (values: Partial<Omit<FXState, 'lastChangeSource' | keyof FXActions>>) => void;
   recallValues: (values: Partial<Omit<FXState, 'lastChangeSource' | keyof FXActions>>) => void;
 };
@@ -46,7 +46,7 @@ const createFXStore = () => create<FXState>((set) => ({
   pan: { x: 0.5, y: 0.5 },
   blackLevel: 0,
   saturation: 1,
-  tintColor: '#ff0000',
+  tintColor: { r: 255, g: 0, b: 0, a: 1 },
   lastChangeSource: 'init',
   
   setBrightnessContrast: (x: number, y: number) => 
@@ -64,7 +64,7 @@ const createFXStore = () => create<FXState>((set) => ({
   setSaturation: (value: number) => 
     set({ saturation: value, lastChangeSource: 'user' }),
   
-  setTintColor: (color: string, source: 'user' | 'recall' = 'user') => 
+  setTintColor: (color: { r: number; g: number; b: number; a: number }, source: 'user' | 'recall' = 'user') =>
     set({ tintColor: color, lastChangeSource: source }),
   
   setAllValues: (values) => 

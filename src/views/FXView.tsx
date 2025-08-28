@@ -16,13 +16,13 @@ type RGBA = { r: number; g: number; b: number; a: number };
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 const toHex2 = (n: number) => n.toString(16).padStart(2, '0');
 const rgbaToHex = ({ r, g, b }: RGBA) => `#${toHex2(r)}${toHex2(g)}${toHex2(b)}`;
-const hexToRgba = (hex?: string): RGBA => {
-  if (!hex || !/^#([0-9a-f]{6})$/i.test(hex)) return { r: 255, g: 0, b: 0, a: 1 };
+const hexToRgba = (hex?: string, alpha: number = 1): RGBA => {
+  if (!hex || !/^#([0-9a-f]{6})$/i.test(hex)) return { r: 255, g: 0, b: 0, a: alpha };
   return {
     r: parseInt(hex.slice(1, 3), 16),
     g: parseInt(hex.slice(3, 5), 16),
     b: parseInt(hex.slice(5, 7), 16),
-    a: 1,
+    a: alpha,
   };
 };
 const colorEq = (a: RGBA, b: RGBA) =>
@@ -62,7 +62,7 @@ const FXView: React.FC<FXViewProps> = ({
   const setTintColor = useStore((state) => state.setTintColor);
 
   // ----- Tint color: dual-mode control -----
-  const storeRGBA = useMemo(() => hexToRgba(tintColor), [tintColor]);
+  const storeRGBA = useMemo(() => tintColor, [tintColor]);
   const [uiColor, setUiColor] = useState<RGBA>(storeRGBA);
   const liveRef = useRef<RGBA>(storeRGBA);      // latest live color during drag (no re-render)
   const interactingRef = useRef(false);         // true while dragging
@@ -89,14 +89,7 @@ const FXView: React.FC<FXViewProps> = ({
 
   // Single commit to store (and one optional OSC send) on release
   const commitTint = useCallback((c: RGBA) => {
-    const hex = rgbaToHex(c);
-    // match your action signature if it accepts a source:
-    try {
-      // @ts-ignore - support (hex, 'user') signature if present
-      setTintColor(hex, 'user');
-    } catch {
-      setTintColor(hex as any);
-    }
+    setTintColor({ r: c.r, g: c.g, b: c.b, a: clamp01(c.a) }, 'user');
     if (isConnected && onSend) onSend(`/${fxType}/tint`, c.r / 255, c.g / 255, c.b / 255, clamp01(c.a));
   }, [fxType, isConnected, onSend, setTintColor]);
 
@@ -155,7 +148,7 @@ const FXView: React.FC<FXViewProps> = ({
   //  - Not dragging: controlled with value={rgbaToHex(uiColor)}
   //  - Dragging:     uncontrolled (omit 'value'), keeps pointer capture
   const pickerControlledProps = !interactingRef.current
-    ? { value: rgbaToHex(uiColor) }
+    ? { value: `rgba(${uiColor.r}, ${uiColor.g}, ${uiColor.b}, ${uiColor.a})` }
     : {};
 
   return (
