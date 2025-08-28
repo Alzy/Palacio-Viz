@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import XYControl from '@/components/common/XYControl';
 import Knob from '@/components/common/Knob';
 import {
@@ -45,27 +45,47 @@ const FXView: React.FC<FXViewProps> = ({
   const setTintColor = useStore((state) => state.setTintColor);
 
   // Following the transient updates pattern from the strategy document:
-  // Use a ref to track the current color and subscribe to store changes
-  // to update the ColorPicker without causing re-renders
+  // Use local state for immediate responsiveness and debounce store updates
   const colorPickerRef = useRef<HTMLDivElement>(null);
-  const currentTintRef = useRef(tintColor);
+  const [localTintColor, setLocalTintColor] = useState(tintColor);
   const [colorPickerKey, setColorPickerKey] = useState(0);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Subscribe to store changes for transient updates (strategy doc pattern)
+  // Subscribe to store changes for external updates (strategy doc pattern)
   useEffect(() => {
     const unsubscribe = useStore.subscribe((state) => {
       // Only update if the color actually changed and it was an external change
-      if (state.tintColor !== currentTintRef.current && state.lastChangeSource === 'recall') {
-        currentTintRef.current = state.tintColor;
+      if (state.tintColor !== localTintColor && state.lastChangeSource === 'recall') {
+        setLocalTintColor(state.tintColor);
         // Force ColorPicker remount only for external changes (like presets)
         setColorPickerKey(prev => prev + 1);
       }
     });
     
     return unsubscribe;
-  }, [useStore]);
+  }, [useStore, localTintColor]);
 
-  // Simplified onChange handler following strategy doc recommendations
+  // Debounced store update function (strategy doc: "Consider Debouncing for Commit or Heavy Work")
+  const debouncedStoreUpdate = useCallback((hexColor: string) => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    debounceTimeoutRef.current = setTimeout(() => {
+      setTintColor(hexColor, 'user');
+    }, 300); // 300ms debounce for store updates
+  }, [setTintColor]);
+
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Immediate onChange handler for responsive UI, debounced store updates
   const handleTintChange = useCallback((rgba: number[]) => {
     const r = Math.round(rgba[0]);
     const g = Math.round(rgba[1]);
@@ -73,15 +93,15 @@ const FXView: React.FC<FXViewProps> = ({
     const a = rgba[3] ?? 1.0;
     const hexColor = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
     
-    // Update ref immediately to prevent feedback loops
-    currentTintRef.current = hexColor;
+    // Update local state immediately for responsive UI
+    setLocalTintColor(hexColor);
     
-    // Update store with user source
-    setTintColor(hexColor, 'user');
-    
-    // Send OSC message
+    // Send OSC message immediately for real-time control
     onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
-  }, [fxType, onSend, setTintColor]);
+    
+    // Debounce store updates to reduce reactivity issues
+    debouncedStoreUpdate(hexColor);
+  }, [fxType, onSend, debouncedStoreUpdate]);
 
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
     setBrightnessContrast(value.x, value.y);
@@ -142,14 +162,13 @@ const FXView: React.FC<FXViewProps> = ({
             description={`Color tinting effect. Sends RGBA floats to /${fxType}/tint`}
             className={`h-full`}
           >
-            <div className="w-full h-full min-h-[200px] p-4">
-              <div ref={colorPickerRef}>
-                <ColorPicker
-                  key={`tint-${fxType}-${colorPickerKey}`}
-                  defaultValue={tintColor}
-                  onChange={handleTintChange as any}
-                  className="w-full h-full"
-                >
+            <div className="w-full h-full min-h-[200px] p-4" ref={colorPickerRef}>
+              <ColorPicker
+                key={`tint-${fxType}-${colorPickerKey}`}
+                defaultValue={localTintColor}
+                onChange={handleTintChange as any}
+                className="w-full h-full"
+              >
                 <ColorPickerSelection className={'flex-1'}  />
                 <div className="space-y-2">
                   <ColorPickerHue />
@@ -157,8 +176,7 @@ const FXView: React.FC<FXViewProps> = ({
                     <ColorPickerAlpha />
                   </div>
                 </div>
-                </ColorPicker>
-              </div>
+              </ColorPicker>
             </div>
           </ControlCard>
         </div>
