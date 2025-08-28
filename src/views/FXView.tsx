@@ -74,6 +74,10 @@ const FXView: React.FC<FXViewProps> = ({
   const panLiveRef = useRef(pan);
   const panInteractingRef = useRef(false);
 
+  // ----- Knob Controls: simple controlled (same as FeedbackView) -----
+  const [uiBlackLevel, setUiBlackLevel] = useState(blackLevel);
+  const [uiSaturation, setUiSaturation] = useState(saturation);
+
   // If your store uses a 'recall' flag to remount the picker, keep your key
   const tintKeyRef = useRef(0);
   useEffect(() => {
@@ -114,6 +118,15 @@ const FXView: React.FC<FXViewProps> = ({
       panLiveRef.current = pan;
     }
   }, [pan]);
+
+  // Sync knob controls from store
+  useEffect(() => {
+    setUiBlackLevel(blackLevel);
+  }, [blackLevel]);
+
+  useEffect(() => {
+    setUiSaturation(saturation);
+  }, [saturation]);
 
   // Single commit to store (and one optional OSC send) on release
   const commitTint = useCallback((c: RGBA) => {
@@ -189,15 +202,24 @@ const FXView: React.FC<FXViewProps> = ({
     setPan(value.x, value.y);
   }, [setPan]);
 
+  // Knob Controls: clean and simple (same as FeedbackView)
   const handleBlackLevelChange = useCallback((value: number) => {
-    setBlackLevel(value);
     onSend?.(`/${fxType}/black_level`, value);
-  }, [fxType, onSend, setBlackLevel]);
+  }, [fxType, onSend]);
+
+  const handleBlackLevelChangeEnd = useCallback((value: number) => {
+    setUiBlackLevel(value);
+    setBlackLevel(value);
+  }, [setBlackLevel]);
 
   const handleSaturationChange = useCallback((value: number) => {
-    setSaturation(value);
     onSend?.(`/${fxType}/saturation`, value);
-  }, [fxType, onSend, setSaturation]);
+  }, [fxType, onSend]);
+
+  const handleSaturationChangeEnd = useCallback((value: number) => {
+    setUiSaturation(value);
+    setSaturation(value);
+  }, [setSaturation]);
 
   const ControlCard: React.FC<{ title: string; description: string; children: React.ReactNode; className?: string; }> = ({ title, description, children, className }) => (
     <div className={`bg-card rounded-lg shadow-md p-4 flex flex-col ${className}`}>
@@ -300,11 +322,11 @@ const FXView: React.FC<FXViewProps> = ({
           >
             <div className="w-full h-full flex items-center justify-center">
               <Knob
-                value={blackLevel}
+                value={uiBlackLevel}
                 onChange={handleBlackLevelChange}
-                min={0}
-                max={1}
-                step={0.01}
+                onChangeEnd={handleBlackLevelChangeEnd}
+                valueMin={0}
+                valueMax={1}
                 disabled={!isConnected}
                 size={120}
               />
@@ -318,11 +340,11 @@ const FXView: React.FC<FXViewProps> = ({
           >
             <div className="w-full h-full flex items-center justify-center">
               <Knob
-                value={saturation}
+                value={uiSaturation}
                 onChange={handleSaturationChange}
-                min={0}
-                max={2}
-                step={0.01}
+                onChangeEnd={handleSaturationChangeEnd}
+                valueMin={0}
+                valueMax={2}
                 disabled={!isConnected}
                 size={120}
               />
