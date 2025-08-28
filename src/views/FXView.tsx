@@ -45,25 +45,24 @@ const FXView: React.FC<FXViewProps> = ({
   const setTintColor = useStore((state) => state.setTintColor);
 
   // Following the transient updates pattern from the strategy document:
-  // Use local state for immediate responsiveness and debounce store updates
+  // Use refs to track state without causing re-renders during interaction
   const colorPickerRef = useRef<HTMLDivElement>(null);
-  const [localTintColor, setLocalTintColor] = useState(tintColor);
   const [colorPickerKey, setColorPickerKey] = useState(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isUserInteractingRef = useRef(false);
   
   // Subscribe to store changes for external updates (strategy doc pattern)
   useEffect(() => {
     const unsubscribe = useStore.subscribe((state) => {
-      // Only update if the color actually changed and it was an external change
-      if (state.tintColor !== localTintColor && state.lastChangeSource === 'recall') {
-        setLocalTintColor(state.tintColor);
-        // Force ColorPicker remount only for external changes (like presets)
+      // Only update if it was an external change and user is not currently interacting
+      if (state.lastChangeSource === 'recall' && !isUserInteractingRef.current) {
+        // Force ColorPicker remount for external changes (like presets)
         setColorPickerKey(prev => prev + 1);
       }
     });
     
     return unsubscribe;
-  }, [useStore, localTintColor]);
+  }, [useStore]);
 
   // Debounced store update function (strategy doc: "Consider Debouncing for Commit or Heavy Work")
   const debouncedStoreUpdate = useCallback((hexColor: string) => {
@@ -73,6 +72,7 @@ const FXView: React.FC<FXViewProps> = ({
     
     debounceTimeoutRef.current = setTimeout(() => {
       setTintColor(hexColor, 'user');
+      isUserInteractingRef.current = false; // Mark interaction as complete
     }, 300); // 300ms debounce for store updates
   }, [setTintColor]);
 
@@ -93,8 +93,8 @@ const FXView: React.FC<FXViewProps> = ({
     const a = rgba[3] ?? 1.0;
     const hexColor = `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
     
-    // Update local state immediately for responsive UI
-    setLocalTintColor(hexColor);
+    // Mark that user is actively interacting
+    isUserInteractingRef.current = true;
     
     // Send OSC message immediately for real-time control
     onSend(`/${fxType}/tint`, r / 255, g / 255, b / 255, a);
@@ -165,7 +165,7 @@ const FXView: React.FC<FXViewProps> = ({
             <div className="w-full h-full min-h-[200px] p-4" ref={colorPickerRef}>
               <ColorPicker
                 key={`tint-${fxType}-${colorPickerKey}`}
-                defaultValue={localTintColor}
+                defaultValue={tintColor}
                 onChange={handleTintChange as any}
                 className="w-full h-full"
               >
