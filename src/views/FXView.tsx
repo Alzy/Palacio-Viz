@@ -58,6 +58,22 @@ const FXView: React.FC<FXViewProps> = ({
   const interactingRef = useRef(false);         // true while dragging
   const ignoreNextOnChangeRef = useRef(false);  // guard when controlled to avoid echo loops
 
+  // ----- XY Controls: dual-mode controls -----
+  // Brightness/Contrast
+  const [uiBrightnessContrast, setUiBrightnessContrast] = useState(brightnessContrast);
+  const brightnessContrastLiveRef = useRef(brightnessContrast);
+  const brightnessContrastInteractingRef = useRef(false);
+
+  // Zoom
+  const [uiZoom, setUiZoom] = useState(zoom);
+  const zoomLiveRef = useRef(zoom);
+  const zoomInteractingRef = useRef(false);
+
+  // Pan
+  const [uiPan, setUiPan] = useState(pan);
+  const panLiveRef = useRef(pan);
+  const panInteractingRef = useRef(false);
+
   // If your store uses a 'recall' flag to remount the picker, keep your key
   const tintKeyRef = useRef(0);
   useEffect(() => {
@@ -76,6 +92,28 @@ const FXView: React.FC<FXViewProps> = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeRGBA]);
+
+  // Sync XY controls from store when not interacting
+  useEffect(() => {
+    if (!brightnessContrastInteractingRef.current) {
+      setUiBrightnessContrast(brightnessContrast);
+      brightnessContrastLiveRef.current = brightnessContrast;
+    }
+  }, [brightnessContrast]);
+
+  useEffect(() => {
+    if (!zoomInteractingRef.current) {
+      setUiZoom(zoom);
+      zoomLiveRef.current = zoom;
+    }
+  }, [zoom]);
+
+  useEffect(() => {
+    if (!panInteractingRef.current) {
+      setUiPan(pan);
+      panLiveRef.current = pan;
+    }
+  }, [pan]);
 
   // Single commit to store (and one optional OSC send) on release
   const commitTint = useCallback((c: RGBA) => {
@@ -102,21 +140,54 @@ const FXView: React.FC<FXViewProps> = ({
     liveRef.current = next;
   };
 
-  // Other controls (keep your immediate send behavior + styling)
+  // XY Controls: dual-mode pattern (same as tint)
   const handleBrightnessContrastChange = useCallback((value: { x: number; y: number }) => {
-    setBrightnessContrast(value.x, value.y);
     onSend?.(`/${fxType}/brightness_contrast`, value.x, value.y);
-  }, [fxType, onSend, setBrightnessContrast]);
+    if (brightnessContrastInteractingRef.current) {
+      brightnessContrastLiveRef.current = value;
+      return;
+    }
+    setUiBrightnessContrast(value);
+    brightnessContrastLiveRef.current = value;
+  }, [fxType, onSend]);
+
+  const handleBrightnessContrastEnd = useCallback((value: { x: number; y: number }) => {
+    brightnessContrastInteractingRef.current = false;
+    setUiBrightnessContrast(value);
+    setBrightnessContrast(value.x, value.y);
+  }, [setBrightnessContrast]);
 
   const handleZoomChange = useCallback((value: { x: number; y: number }) => {
-    setZoom(value.x, value.y);
     onSend?.(`/${fxType}/zoom`, value.x, value.y);
-  }, [fxType, onSend, setZoom]);
+    if (zoomInteractingRef.current) {
+      zoomLiveRef.current = value;
+      return;
+    }
+    setUiZoom(value);
+    zoomLiveRef.current = value;
+  }, [fxType, onSend]);
+
+  const handleZoomEnd = useCallback((value: { x: number; y: number }) => {
+    zoomInteractingRef.current = false;
+    setUiZoom(value);
+    setZoom(value.x, value.y);
+  }, [setZoom]);
 
   const handlePanChange = useCallback((value: { x: number; y: number }) => {
-    setPan(value.x, value.y);
     onSend?.(`/${fxType}/pan`, value.x, value.y);
-  }, [fxType, onSend, setPan]);
+    if (panInteractingRef.current) {
+      panLiveRef.current = value;
+      return;
+    }
+    setUiPan(value);
+    panLiveRef.current = value;
+  }, [fxType, onSend]);
+
+  const handlePanEnd = useCallback((value: { x: number; y: number }) => {
+    panInteractingRef.current = false;
+    setUiPan(value);
+    setPan(value.x, value.y);
+  }, [setPan]);
 
   const handleBlackLevelChange = useCallback((value: number) => {
     setBlackLevel(value);
@@ -139,8 +210,21 @@ const FXView: React.FC<FXViewProps> = ({
   // Dual-mode control for the picker:
   //  - Not dragging: controlled with value={rgbaToHex(uiColor)}
   //  - Dragging:     uncontrolled (omit 'value'), keeps pointer capture
+  // Dual-mode control props for all controls
   const pickerControlledProps = !interactingRef.current
     ? { value: `rgba(${uiColor.r}, ${uiColor.g}, ${uiColor.b}, ${uiColor.a})` }
+    : {};
+
+  const brightnessContrastControlledProps = !brightnessContrastInteractingRef.current
+    ? { value: uiBrightnessContrast }
+    : {};
+
+  const zoomControlledProps = !zoomInteractingRef.current
+    ? { value: uiZoom }
+    : {};
+
+  const panControlledProps = !panInteractingRef.current
+    ? { value: uiPan }
     : {};
 
   return (
@@ -152,10 +236,14 @@ const FXView: React.FC<FXViewProps> = ({
             title="Brightness & Contrast"
             description={`X: Brightness, Y: Contrast. Sends to /${fxType}/brightness_contrast`}
           >
-            <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
+            <div
+              className="w-full h-full min-h-[200px] aspect-square mx-auto"
+              onPointerDownCapture={() => { brightnessContrastInteractingRef.current = true; }}
+            >
               <XYControl
-                value={brightnessContrast}
+                {...brightnessContrastControlledProps}
                 onChange={handleBrightnessContrastChange}
+                onChangeEnd={handleBrightnessContrastEnd}
                 disabled={!isConnected}
                 xTitle="Brightness"
                 yTitle="Contrast"
@@ -250,10 +338,14 @@ const FXView: React.FC<FXViewProps> = ({
             title="Zoom Control"
             description={`X: Zoom X, Y: Zoom Y. Sends to /${fxType}/zoom`}
           >
-            <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
+            <div
+              className="w-full h-full min-h-[200px] aspect-square mx-auto"
+              onPointerDownCapture={() => { zoomInteractingRef.current = true; }}
+            >
               <XYControl
-                value={zoom}
+                {...zoomControlledProps}
                 onChange={handleZoomChange}
+                onChangeEnd={handleZoomEnd}
                 disabled={!isConnected}
                 xTitle="Zoom X"
                 yTitle="Zoom Y"
@@ -266,10 +358,14 @@ const FXView: React.FC<FXViewProps> = ({
             title="Pan Control"
             description={`X: Pan X, Y: Pan Y. Sends to /${fxType}/pan`}
           >
-            <div className="w-full h-full min-h-[200px] aspect-square mx-auto">
+            <div
+              className="w-full h-full min-h-[200px] aspect-square mx-auto"
+              onPointerDownCapture={() => { panInteractingRef.current = true; }}
+            >
               <XYControl
-                value={pan}
+                {...panControlledProps}
                 onChange={handlePanChange}
+                onChangeEnd={handlePanEnd}
                 disabled={!isConnected}
                 xTitle="Pan X"
                 yTitle="Pan Y"
